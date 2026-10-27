@@ -1,0 +1,56 @@
+// Ensox UI: a Minecraft GUI framework with no dependency on LootBeamsUp.
+// Packages: com.ensox.base (shared value types: color, insets, geometry, easing)
+// and com.ensox.ui (widgets, layout, painting, input).
+// Loaders compile these sources into the mod jar the same way they compile :common,
+// so the module never exists as a second runtime jar.
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev'
+}
+
+base {
+    archivesName = "ensox-ui-${minecraft_version}"
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(java_version)
+}
+
+repositories {
+    mavenCentral()
+}
+
+neoForge {
+    neoFormVersion = neo_form_version
+    // The UI needs GuiGraphics.guiRenderState (custom GUI elements). The entry lives in the
+    // host mod's access transformer / access widener, which apply at runtime; compile against it here.
+    accessTransformers.from(project(':common').file('src/main/resources/META-INF/accesstransformer.cfg').absolutePath)
+}
+
+dependencies {
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+configurations {
+    testCompileClasspath.extendsFrom(modDevCompileDependencies)
+    testRuntimeClasspath.extendsFrom(modDevCompileDependencies)
+    commonJava {
+        canBeResolved = false
+        canBeConsumed = true
+    }
+    commonResources {
+        canBeResolved = false
+        canBeConsumed = true
+    }
+}
+
+artifacts {
+    commonJava sourceSets.main.java.sourceDirectories.singleFile
+    commonResources sourceSets.main.resources.sourceDirectories.singleFile
+}
