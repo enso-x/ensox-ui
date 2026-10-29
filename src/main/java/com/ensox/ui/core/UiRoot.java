@@ -11,7 +11,7 @@ import com.ensox.ui.layout.Position;
 import com.ensox.ui.paint.Canvas;
 import com.mojang.blaze3d.platform.cursor.CursorType;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
@@ -174,7 +174,7 @@ public final class UiRoot {
 
     // ---- frame -------------------------------------------------------------------------
 
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         long now = System.nanoTime();
         float deltaSeconds = lastFrameNanos == 0 ? 0f : Math.min(0.25f, (now - lastFrameNanos) / 1_000_000_000f);
         lastFrameNanos = now;

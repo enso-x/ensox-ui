@@ -4,7 +4,7 @@ import com.ensox.base.Insets;
 
 /**
  * Immutable integer rectangle in GUI coordinates. {@link #right()} and
- * {@link #bottom()} are exclusive, matching {@code GuiGraphics.fill}.
+ * {@link #bottom()} are exclusive, matching {@code GuiGraphicsExtractor.fill}.
  */
 public record Rect(int x, int y, int width, int height) {
     public static final Rect EMPTY = new Rect(0, 0, 0, 0);

@@ -1,6 +1,8 @@
 package com.ensox.ui.core;
 
-import net.minecraft.client.gui.GuiGraphics;
+import com.mojang.blaze3d.platform.InputConstants;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -67,15 +69,15 @@ public abstract class UiScreen extends Screen {
     }
 
     @Override
-    public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+    public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         if (vanillaBackground()) {
-            super.renderBackground(graphics, mouseX, mouseY, partialTick);
+            super.extractBackground(graphics, mouseX, mouseY, partialTick);
         }
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
         if (root != null) {
             root.render(graphics, mouseX, mouseY, partialTick);
         }
@@ -123,6 +125,14 @@ public abstract class UiScreen extends Screen {
 
     @Override
     public boolean charTyped(CharacterEvent event) {
-        return root != null && root.textTyped(event.codepoint(), event.modifiers());
+        return root != null && root.textTyped(event.codepoint(), heldModifiers());
+    }
+
+    /** A CharacterEvent no longer carries modifiers (26.1): read the keys held right now. */
+    private static int heldModifiers() {
+        Minecraft minecraft = Minecraft.getInstance();
+        return (minecraft.hasShiftDown() ? InputConstants.MOD_SHIFT : 0)
+            | (minecraft.hasControlDown() ? InputConstants.MOD_CONTROL : 0)
+            | (minecraft.hasAltDown() ? InputConstants.MOD_ALT : 0);
     }
 }

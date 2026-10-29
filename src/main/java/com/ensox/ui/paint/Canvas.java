@@ -11,9 +11,9 @@ import com.ensox.ui.paint.element.PolylineElementRenderState;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
-import net.minecraft.client.gui.render.state.GuiElementRenderState;
+import net.minecraft.client.renderer.state.gui.GuiElementRenderState;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -27,24 +27,24 @@ import java.util.Deque;
 
 /**
  * Drawing surface for widgets: a thin, rectangle-oriented facade over
- * {@link GuiGraphics}. Everything drawn goes through the vanilla GUI render
+ * {@link GuiGraphicsExtractor}. Everything drawn goes through the vanilla GUI render
  * state, so batching, strata and tooltips behave like vanilla.
  *
  * <p>{@link #graphics()} is the escape hatch for anything not covered here,
  * including custom {@code GuiElementRenderState}s.</p>
  */
 public final class Canvas {
-    private final GuiGraphics graphics;
+    private final GuiGraphicsExtractor graphics;
     private final Font font;
     /** Clip rectangles in GUI space, innermost last; mirrors the vanilla scissor stack. */
     private final Deque<Rect> clips = new ArrayDeque<>();
 
-    public Canvas(GuiGraphics graphics) {
+    public Canvas(GuiGraphicsExtractor graphics) {
         this.graphics = graphics;
         this.font = Minecraft.getInstance().font;
     }
 
-    public GuiGraphics graphics() {
+    public GuiGraphicsExtractor graphics() {
         return graphics;
     }
 
@@ -72,16 +72,16 @@ public final class Canvas {
 
     public void outline(Rect rect, int argb) {
         if (!rect.isEmpty()) {
-            graphics.renderOutline(rect.x(), rect.y(), rect.width(), rect.height(), argb);
+            graphics.outline(rect.x(), rect.y(), rect.width(), rect.height(), argb);
         }
     }
 
     public void horizontalLine(int x1, int x2, int y, int argb) {
-        graphics.hLine(x1, x2, y, argb);
+        graphics.horizontalLine(x1, x2, y, argb);
     }
 
     public void verticalLine(int x, int y1, int y2, int argb) {
-        graphics.vLine(x, y1, y2, argb);
+        graphics.verticalLine(x, y1, y2, argb);
     }
 
     /** Four-corner gradient, optionally through a custom GUI pipeline (for example an HSV spectrum). */
@@ -128,7 +128,7 @@ public final class Canvas {
      * it respects widget clipping.
      */
     public void submit(GuiElementRenderState element) {
-        graphics.guiRenderState.submitGuiElement(element);
+        graphics.guiRenderState.addGuiElement(element);
     }
 
     /** Current vanilla scissor (already transformed by the pose), or {@code null}. */
@@ -269,19 +269,19 @@ public final class Canvas {
     }
 
     public void text(Component text, int x, int y, int argb, boolean shadow) {
-        graphics.drawString(font, text, x, y, argb, shadow);
+        graphics.text(font, text, x, y, argb, shadow);
     }
 
     public void text(FormattedCharSequence text, int x, int y, int argb, boolean shadow) {
-        graphics.drawString(font, text, x, y, argb, shadow);
+        graphics.text(font, text, x, y, argb, shadow);
     }
 
     public void text(String text, int x, int y, int argb, boolean shadow) {
-        graphics.drawString(font, text, x, y, argb, shadow);
+        graphics.text(font, text, x, y, argb, shadow);
     }
 
     public void item(ItemStack stack, int x, int y) {
-        graphics.renderItem(stack, x, y);
+        graphics.item(stack, x, y);
     }
 
     // ---- clipping and transforms -----------------------------------------------
