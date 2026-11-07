@@ -152,8 +152,9 @@ public final class ColorX implements Animatable<ColorX> {
     public static ColorX of(DyeColor dyeColor) { return of(dyeColor.getTextureDiffuseColor()); }
 
     public static ColorX of(ChatFormatting formatting) {
-        var colorValue = formatting.getColor();
-        return ofPacked(colorValue == null ? 0 : colorValue, PackedFormat.RGB);
+        // 26.2: ChatFormatting no longer carries its color; TextColor maps the legacy codes.
+        TextColor color = TextColor.fromLegacyFormat(formatting);
+        return ofPacked(color == null ? 0 : color.getValue(), PackedFormat.RGB);
     }
 
     // ------------------------------ Accessors ------------------------------
