@@ -1,5 +1,6 @@
 package com.ensox.ui.widget;
 
+import com.ensox.ui.core.TextInput;
 import com.ensox.ui.core.Widget;
 import com.ensox.ui.event.KeyEvent;
 import com.ensox.ui.event.PointerEvent;
@@ -199,9 +200,25 @@ public class TextField extends Widget {
     @Override
     protected void onFocusChanged(boolean focused) {
         view.restartBlink();
+        textInput(focused);
         if (!focused) {
             editor.deselect();
             commit();
+        }
+    }
+
+    @Override
+    protected void onDetach() {
+        // Detaching clears focus without onFocusChanged.
+        textInput(false);
+    }
+
+    /** Typed characters need text input while focused ({@link TextInput}). */
+    private void textInput(boolean on) {
+        if (on) {
+            TextInput.start(this, contentBounds());
+        } else {
+            TextInput.stop(this);
         }
     }
 
