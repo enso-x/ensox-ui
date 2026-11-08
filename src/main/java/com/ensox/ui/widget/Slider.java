@@ -8,7 +8,7 @@ import com.ensox.ui.paint.Canvas;
 import com.ensox.ui.state.Signal;
 import com.mojang.blaze3d.platform.cursor.CursorTypes;
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
@@ -189,8 +189,8 @@ public class Slider extends Widget {
         }
         double unit = (step > 0 ? step : (max - min) / 100) * (event.modifiers().shift() ? 10 : 1);
         int direction = switch (event.key()) {
-            case GLFW.GLFW_KEY_LEFT, GLFW.GLFW_KEY_DOWN -> -1;
-            case GLFW.GLFW_KEY_RIGHT, GLFW.GLFW_KEY_UP -> 1;
+            case InputConstants.KEY_LEFT, InputConstants.KEY_DOWN -> -1;
+            case InputConstants.KEY_RIGHT, InputConstants.KEY_UP -> 1;
             default -> 0;
         };
         if (direction != 0) {

@@ -8,7 +8,7 @@ import com.ensox.ui.paint.element.BezierLineElementRenderState;
 import com.ensox.ui.paint.element.GradientQuadElementRenderState;
 import com.ensox.ui.paint.element.LineElementRenderState;
 import com.ensox.ui.paint.element.PolylineElementRenderState;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;

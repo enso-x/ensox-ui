@@ -1,6 +1,6 @@
 package com.ensox.ui.event;
 
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 
 /**
  * Mouse pointer event in GUI coordinates.
@@ -58,21 +58,21 @@ public final class PointerEvent extends UiEvent {
         return y;
     }
 
-    /** GLFW mouse button; {@code -1} for {@link Type#MOVE}. */
+    /** InputConstants mouse button; {@code -1} for {@link Type#MOVE}. */
     public int button() {
         return button;
     }
 
     public boolean isPrimary() {
-        return button == GLFW.GLFW_MOUSE_BUTTON_LEFT;
+        return button == InputConstants.MOUSE_BUTTON_LEFT;
     }
 
     public boolean isSecondary() {
-        return button == GLFW.GLFW_MOUSE_BUTTON_RIGHT;
+        return button == InputConstants.MOUSE_BUTTON_RIGHT;
     }
 
     public boolean isMiddle() {
-        return button == GLFW.GLFW_MOUSE_BUTTON_MIDDLE;
+        return button == InputConstants.MOUSE_BUTTON_MIDDLE;
     }
 
     public Modifiers modifiers() {

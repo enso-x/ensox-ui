@@ -15,7 +15,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundEvents;
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 
 /**
  * Clickable widget with a pluggable {@link Skin} and optional text or icon.
@@ -196,7 +196,7 @@ public class Button extends Widget {
     @Override
     protected void onKey(KeyEvent event) {
         if (event.type() == KeyEvent.Type.PRESS && isFocused()
-            && (event.key() == GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_SPACE || event.key() == GLFW.GLFW_KEY_KP_ENTER)) {
+            && (event.key() == InputConstants.KEY_RETURN || event.key() == InputConstants.KEY_SPACE || event.key() == InputConstants.KEY_NUMPADENTER)) {
             activate();
             event.consume();
         }

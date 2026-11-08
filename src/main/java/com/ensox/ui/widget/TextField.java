@@ -15,7 +15,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -218,7 +218,7 @@ public class TextField extends Widget {
             return;
         }
         boolean handled = editor.press(event);
-        if (!handled && (event.key() == GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_KP_ENTER)) {
+        if (!handled && (event.key() == InputConstants.KEY_RETURN || event.key() == InputConstants.KEY_NUMPADENTER)) {
             // Escape and Tab stay unhandled: the root uses them for overlays, focus and closing.
             commit();
             handled = true;

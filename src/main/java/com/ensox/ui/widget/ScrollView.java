@@ -13,7 +13,7 @@ import com.ensox.ui.geom.Rect;
 import com.ensox.ui.paint.Canvas;
 import net.minecraft.util.Mth;
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 
 /**
  * Scrollable viewport around one content widget, on one or both axes.
@@ -448,10 +448,10 @@ public class ScrollView extends Container {
             return;
         }
         switch (event.key()) {
-            case GLFW.GLFW_KEY_UP -> scrollBy(0, -KEY_STEP, true);
-            case GLFW.GLFW_KEY_DOWN -> scrollBy(0, KEY_STEP, true);
-            case GLFW.GLFW_KEY_LEFT -> scrollBy(-KEY_STEP, 0, true);
-            case GLFW.GLFW_KEY_RIGHT -> scrollBy(KEY_STEP, 0, true);
+            case InputConstants.KEY_UP -> scrollBy(0, -KEY_STEP, true);
+            case InputConstants.KEY_DOWN -> scrollBy(0, KEY_STEP, true);
+            case InputConstants.KEY_LEFT -> scrollBy(-KEY_STEP, 0, true);
+            case InputConstants.KEY_RIGHT -> scrollBy(KEY_STEP, 0, true);
             default -> {
                 return;
             }

@@ -28,8 +28,8 @@ public final class KeyEvent extends UiEvent {
         return vanilla.key();
     }
 
-    public int scancode() {
-        return vanilla.scancode();
+    public int keycode() {
+        return vanilla.keycode();
     }
 
     public Modifiers modifiers() {

@@ -5,7 +5,7 @@ import com.ensox.ui.event.TextEvent;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.StringUtil;
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -285,24 +285,24 @@ public final class TextEditor {
             replaceSelection("");
         } else if (key.isPaste()) {
             replaceSelection(Minecraft.getInstance().keyboardHandler.getClipboard());
-        } else if (word && event.key() == GLFW.GLFW_KEY_Z) {
+        } else if (word && event.key() == InputConstants.KEY_Z) {
             if (shift) {
                 redo();
             } else {
                 undo();
             }
-        } else if (word && event.key() == GLFW.GLFW_KEY_Y) {
+        } else if (word && event.key() == InputConstants.KEY_Y) {
             redo();
         } else {
             switch (event.key()) {
-                case GLFW.GLFW_KEY_BACKSPACE -> deleteBy(-1, word);
-                case GLFW.GLFW_KEY_DELETE -> deleteBy(1, word);
-                case GLFW.GLFW_KEY_LEFT -> moveCaret(!shift && hasSelection() && !word
+                case InputConstants.KEY_BACKSPACE -> deleteBy(-1, word);
+                case InputConstants.KEY_DELETE -> deleteBy(1, word);
+                case InputConstants.KEY_LEFT -> moveCaret(!shift && hasSelection() && !word
                     ? selectionStart() : word ? wordBoundary(caret, -1) : step(caret, -1), shift);
-                case GLFW.GLFW_KEY_RIGHT -> moveCaret(!shift && hasSelection() && !word
+                case InputConstants.KEY_RIGHT -> moveCaret(!shift && hasSelection() && !word
                     ? selectionEnd() : word ? wordBoundary(caret, 1) : step(caret, 1), shift);
-                case GLFW.GLFW_KEY_HOME -> moveCaret(0, shift);
-                case GLFW.GLFW_KEY_END -> moveCaret(text.length(), shift);
+                case InputConstants.KEY_HOME -> moveCaret(0, shift);
+                case InputConstants.KEY_END -> moveCaret(text.length(), shift);
                 default -> {
                     return false;
                 }

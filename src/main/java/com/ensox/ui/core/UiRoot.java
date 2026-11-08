@@ -14,7 +14,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -360,11 +360,11 @@ public final class UiRoot {
         if (event.isConsumed()) {
             return true;
         }
-        if (vanilla.key() == GLFW.GLFW_KEY_TAB) {
+        if (vanilla.key() == InputConstants.KEY_TAB) {
             focus.cycle(!vanilla.hasShiftDown());
             return true;
         }
-        if (vanilla.key() == GLFW.GLFW_KEY_ESCAPE && !overlays.isEmpty()) {
+        if (vanilla.key() == InputConstants.KEY_ESCAPE && !overlays.isEmpty()) {
             overlays.getLast().close();
             return true;
         }

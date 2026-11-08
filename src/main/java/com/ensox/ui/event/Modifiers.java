@@ -1,25 +1,25 @@
 package com.ensox.ui.event;
 
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 
-/** Keyboard modifier bit set carried by every input event (GLFW layout). */
+/** Keyboard modifier bit set carried by every input event (InputConstants layout). */
 public record Modifiers(int bits) {
     public static final Modifiers NONE = new Modifiers(0);
 
     public boolean shift() {
-        return (bits & GLFW.GLFW_MOD_SHIFT) != 0;
+        return (bits & InputConstants.MOD_SHIFT) != 0;
     }
 
     public boolean control() {
-        return (bits & GLFW.GLFW_MOD_CONTROL) != 0;
+        return (bits & InputConstants.MOD_CONTROL) != 0;
     }
 
     public boolean alt() {
-        return (bits & GLFW.GLFW_MOD_ALT) != 0;
+        return (bits & InputConstants.MOD_ALT) != 0;
     }
 
     public boolean superKey() {
-        return (bits & GLFW.GLFW_MOD_SUPER) != 0;
+        return (bits & InputConstants.MOD_SUPER) != 0;
     }
 
     public boolean any() {

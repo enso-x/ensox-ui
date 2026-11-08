@@ -14,7 +14,7 @@ import com.ensox.ui.state.Signal;
 import com.mojang.blaze3d.platform.cursor.CursorTypes;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 
 import java.util.List;
 import java.util.Objects;
@@ -231,14 +231,14 @@ public class Select<T> extends Widget {
             return;
         }
         switch (event.key()) {
-            case GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER, GLFW.GLFW_KEY_SPACE -> toggleOpen();
-            case GLFW.GLFW_KEY_UP, GLFW.GLFW_KEY_DOWN -> {
+            case InputConstants.KEY_RETURN, InputConstants.KEY_NUMPADENTER, InputConstants.KEY_SPACE -> toggleOpen();
+            case InputConstants.KEY_UP, InputConstants.KEY_DOWN -> {
                 List<T> items = options.get();
                 if (items.isEmpty()) {
                     return;
                 }
                 int index = items.indexOf(value);
-                int next = Math.floorMod(index + (event.key() == GLFW.GLFW_KEY_DOWN ? 1 : -1), items.size());
+                int next = Math.floorMod(index + (event.key() == InputConstants.KEY_DOWN ? 1 : -1), items.size());
                 choose(items.get(next));
             }
             default -> {
