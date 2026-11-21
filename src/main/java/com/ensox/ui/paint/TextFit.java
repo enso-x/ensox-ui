@@ -1,7 +1,11 @@
 package com.ensox.ui.paint;
 
 import com.ensox.ui.geom.Rect;
+import net.minecraft.client.StringSplitter;
 import net.minecraft.client.gui.Font;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.FormattedText;
+import net.minecraft.network.chat.Style;
 import net.minecraft.util.Mth;
 
 /**
@@ -14,6 +18,25 @@ public final class TextFit {
     private static final long MARQUEE_PAUSE_MS = 250;
 
     private TextFit() {
+    }
+
+    /**
+     * Fits a single styled line, preserving font/bold/color spans and applying
+     * the component's base style to the ellipsis. Returns empty when even the
+     * ellipsis cannot fit. The result remains in logical order for vanilla bidi.
+     */
+    public static FormattedText fit(Font font, Component text, int width) {
+        return fit(font.getSplitter(), text, width);
+    }
+
+    static FormattedText fit(StringSplitter splitter, Component text, int width) {
+        if (width <= 0) return FormattedText.EMPTY;
+        if (splitter.stringWidth(text) <= width) return text;
+        FormattedText ellipsis = FormattedText.of("...", text.getStyle());
+        int ellipsisWidth = Mth.ceil(splitter.stringWidth(ellipsis));
+        if (ellipsisWidth > width) return FormattedText.EMPTY;
+        return FormattedText.composite(
+            splitter.headByWidth(text, width - ellipsisWidth, Style.EMPTY), ellipsis);
     }
 
     public static void draw(Canvas canvas, String text, int x, int y, int width, int argb, boolean shadow, boolean animate) {

@@ -19,7 +19,7 @@ import java.util.function.Supplier;
  *
  * <p>Every setter returns the style, so a widget is described in one chain.
  * Reusable looks are plain {@code Consumer<Style>} constants applied with
- * {@link #apply(Consumer[])} or {@code Widget.style(PRESET, s -> ...)}:</p>
+ * {@link #apply(Consumer[])} or {@code Widget.style(STYLE, s -> ...)}:</p>
  * <pre>
  * static final Consumer&lt;Style&gt; PANEL = s -&gt; s.padding(Insets.of(10, 9)).gap(6).background(Theme.PANEL);
  *
@@ -56,9 +56,9 @@ public final class Style {
     }
 
     @SafeVarargs
-    public final Style apply(Consumer<Style>... presets) {
-        for (Consumer<Style> preset : presets) {
-            preset.accept(this);
+    public final Style apply(Consumer<Style>... styles) {
+        for (Consumer<Style> style : styles) {
+            style.accept(this);
         }
         return this;
     }

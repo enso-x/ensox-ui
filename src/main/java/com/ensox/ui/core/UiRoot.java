@@ -8,11 +8,15 @@ import com.ensox.ui.event.ScrollEvent;
 import com.ensox.ui.event.TextEvent;
 import com.ensox.ui.event.UiEvent;
 import com.ensox.ui.layout.Position;
+import com.ensox.ui.geom.UiTransform;
 import com.ensox.ui.paint.Canvas;
 import com.mojang.blaze3d.platform.cursor.CursorType;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.FormattedCharSequence;
 import org.jetbrains.annotations.Nullable;
 import com.mojang.blaze3d.platform.InputConstants;
 
@@ -34,6 +38,11 @@ import java.util.function.Supplier;
  * stratum, receive input first, and can close on outside clicks or Escape.
  */
 public final class UiRoot {
+    /** Widest widget tooltip line before it wraps. */
+    private static final int TOOLTIP_WIDTH = 200;
+    /** Sprite style of widget tooltips (vanilla's {@code <ns>:tooltip/<path>_background} and {@code _frame}). */
+    private static @Nullable Identifier tooltipStyle;
+
     private final Widget content;
     private final List<Overlay> overlays = new ArrayList<>();
     private final FocusManager focus = new FocusManager(this);
@@ -125,6 +134,7 @@ public final class UiRoot {
         private final Widget widget;
         private final boolean dismissOnOutsideClick;
         private final @Nullable Runnable onClose;
+        private final List<Widget> alsoInside = new ArrayList<>();
 
         private Overlay(Widget widget, boolean dismissOnOutsideClick, @Nullable Runnable onClose) {
             this.widget = widget;
@@ -138,6 +148,23 @@ public final class UiRoot {
 
         public boolean isOpen() {
             return overlays.contains(this);
+        }
+
+        /** Clicks on {@code outside} and its descendants do not count as outside clicks. */
+        public void keepOpenOn(Widget outside) {
+            alsoInside.add(outside);
+        }
+
+        private boolean contains(@Nullable Widget target) {
+            if (isDescendant(target, widget)) {
+                return true;
+            }
+            for (Widget extra : alsoInside) {
+                if (isDescendant(target, extra)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         public void close() {
@@ -172,6 +199,14 @@ public final class UiRoot {
         return overlays.isEmpty() ? content : overlays.getLast().widget;
     }
 
+    /**
+     * Styles every widget tooltip with the theme's sprites ({@code null}: vanilla). Item tooltips drawn by
+     * the game keep their own style.
+     */
+    public static void tooltipStyle(@Nullable Identifier style) {
+        tooltipStyle = style;
+    }
+
     // ---- frame -------------------------------------------------------------------------
 
     public void render(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
@@ -199,7 +234,12 @@ public final class UiRoot {
         if (tooltip != null && captured == null) {
             List<Component> lines = tooltip.get();
             if (lines != null && !lines.isEmpty()) {
-                graphics.setComponentTooltipForNextFrame(Minecraft.getInstance().font, lines, mouseX, mouseY);
+                Font font = Minecraft.getInstance().font;
+                List<FormattedCharSequence> wrapped = new ArrayList<>();
+                for (Component line : lines) {
+                    wrapped.addAll(line.getString().isEmpty() ? List.of(FormattedCharSequence.EMPTY) : font.split(line, TOOLTIP_WIDTH));
+                }
+                graphics.setTooltipForNextFrame(font, wrapped, mouseX, mouseY, tooltipStyle);
             }
         }
     }
@@ -287,7 +327,7 @@ public final class UiRoot {
 
         if (!overlays.isEmpty()) {
             Overlay top = overlays.getLast();
-            if (top.dismissOnOutsideClick && !isDescendant(target, top.widget)) {
+            if (top.dismissOnOutsideClick && !top.contains(target)) {
                 top.close();
                 return true;
             }
@@ -333,7 +373,7 @@ public final class UiRoot {
             // An ancestor intercepted the drag: it now owns the gesture.
             Widget previous = captured;
             captured = handler;
-            previous.dispatch(new PointerEvent(PointerEvent.Type.CANCEL, x, y, button, new Modifiers(modifiers), false, 0, 0));
+            deliver(previous, new PointerEvent(PointerEvent.Type.CANCEL, x, y, button, new Modifiers(modifiers), false, 0, 0), false);
         }
         return event.isConsumed();
     }
@@ -419,7 +459,7 @@ public final class UiRoot {
         for (int i = path.size() - 1; i >= 0; i--) {
             Widget w = path.get(i);
             if (w.isEnabled()) {
-                w.intercept(event);
+                deliver(w, event, true);
                 if (event.isConsumed()) {
                     return w;
                 }
@@ -427,13 +467,32 @@ public final class UiRoot {
         }
         for (Widget w : path) {
             if (w.isEnabled()) {
-                w.dispatch(event);
+                deliver(w, event, false);
                 if (event.isConsumed()) {
                     return w;
                 }
             }
         }
         return null;
+    }
+
+    /** Events are screen-based at the root and local to each receiving subtree. */
+    private static void deliver(Widget receiver, UiEvent original, boolean intercept) {
+        UiTransform transform = receiver.screenTransform();
+        UiEvent local = original;
+        if (!transform.equals(UiTransform.IDENTITY)) {
+            if (original instanceof PointerEvent event) {
+                local = new PointerEvent(event.type(), transform.unmapX(event.x()), transform.unmapY(event.y()),
+                    event.button(), event.modifiers(), event.isDoubleClick(),
+                    event.deltaX() / transform.scale(), event.deltaY() / transform.scale());
+            } else if (original instanceof ScrollEvent event) {
+                local = new ScrollEvent(transform.unmapX(event.x()), transform.unmapY(event.y()),
+                    event.amountX(), event.amountY(), event.modifiers());
+            }
+            local.target(original.target());
+        }
+        if (intercept) receiver.intercept(local); else receiver.dispatch(local);
+        if (local.isConsumed()) original.consume();
     }
 
     private static boolean isDescendant(@Nullable Widget widget, Widget ancestor) {

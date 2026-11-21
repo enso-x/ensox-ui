@@ -69,6 +69,17 @@ public final class Popup extends Container {
         }
     }
 
+    /**
+     * Clicks on {@code widget} (outside the popup) keep it open, for a control that belongs to the popup
+     * while living elsewhere, such as a Select field that is the popup's filter input.
+     */
+    public Popup keepOpenOn(Widget widget) {
+        if (overlay != null) {
+            overlay.keepOpenOn(widget);
+        }
+        return this;
+    }
+
     @Override
     protected void measureSelf(int availableWidth, int availableHeight, int spaceWidth, int spaceHeight) {
         content.measure(spaceWidth, spaceHeight);
@@ -84,7 +95,7 @@ public final class Popup extends Container {
 
     private Rect placement() {
         Rect area = visibleArea.get();
-        Rect a = anchor.bounds();
+        Rect a = anchor.screenBounds();
         int w = content.outerWidth();
         int h = content.outerHeight();
         int preferredX = alignRight ? a.right() - w : a.x();

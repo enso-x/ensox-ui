@@ -4,6 +4,7 @@ import com.ensox.base.ColorX;
 import com.ensox.ui.asset.AssetKey;
 import com.ensox.ui.asset.AssetLibrary;
 import com.ensox.ui.geom.Rect;
+import com.ensox.ui.geom.UiTransform;
 import com.ensox.ui.paint.element.BezierLineElementRenderState;
 import com.ensox.ui.paint.element.GradientQuadElementRenderState;
 import com.ensox.ui.paint.element.LineElementRenderState;
@@ -15,8 +16,12 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.renderer.state.gui.GuiElementRenderState;
 import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.FormattedText;
+import net.minecraft.network.chat.Style;
 import net.minecraft.resources.Identifier;
+import net.minecraft.util.ARGB;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
@@ -24,6 +29,8 @@ import org.joml.Matrix3x2f;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Drawing surface for widgets: a thin, rectangle-oriented facade over
@@ -36,12 +43,46 @@ import java.util.Deque;
 public final class Canvas {
     private final GuiGraphicsExtractor graphics;
     private final Font font;
+    private final int tintArgb;
     /** Clip rectangles in GUI space, innermost last; mirrors the vanilla scissor stack. */
-    private final Deque<Rect> clips = new ArrayDeque<>();
+    private final Deque<Rect> clips;
+    private final Deque<UiTransform> coordinateSpaces;
 
     public Canvas(GuiGraphicsExtractor graphics) {
+        this(graphics, Minecraft.getInstance().font);
+    }
+
+    Canvas(GuiGraphicsExtractor graphics, Font font) {
         this.graphics = graphics;
-        this.font = Minecraft.getInstance().font;
+        this.font = font;
+        this.tintArgb = -1;
+        this.clips = new ArrayDeque<>();
+        this.coordinateSpaces = new ArrayDeque<>();
+    }
+
+    private Canvas(Canvas source, int tintArgb) {
+        this.graphics = source.graphics;
+        this.font = source.font;
+        this.tintArgb = tintArgb;
+        // A color view changes only modulation. Clips and transforms still belong
+        // to the same drawing surface, including when a custom paint uses both views.
+        this.clips = source.clips;
+        this.coordinateSpaces = source.coordinateSpaces;
+    }
+
+    /** A view with multiplied RGBA colors; the original view is never modified. */
+    public Canvas withColor(ColorX tint) {
+        int argb = tint.toIntARGB();
+        return argb == -1 ? this : new Canvas(this, ARGB.multiply(tintArgb, argb));
+    }
+
+    /** Applies this view's tint once, for custom render states submitted via {@link #submit}. */
+    public int tintColor(int argb) {
+        return ARGB.multiply(argb, tintArgb);
+    }
+
+    public ColorX tintColor(ColorX color) {
+        return tintArgb == -1 ? color : ColorX.of(tintColor(color.toIntARGB()));
     }
 
     public GuiGraphicsExtractor graphics() {
@@ -55,6 +96,7 @@ public final class Canvas {
     // ---- shapes -------------------------------------------------------------
 
     public void fill(Rect rect, int argb) {
+        argb = tintColor(argb);
         if (!rect.isEmpty() && (argb >>> 24) != 0) {
             graphics.fill(rect.x(), rect.y(), rect.right(), rect.bottom(), argb);
         }
@@ -66,25 +108,28 @@ public final class Canvas {
 
     public void verticalGradient(Rect rect, int topArgb, int bottomArgb) {
         if (!rect.isEmpty()) {
-            graphics.fillGradient(rect.x(), rect.y(), rect.right(), rect.bottom(), topArgb, bottomArgb);
+            graphics.fillGradient(rect.x(), rect.y(), rect.right(), rect.bottom(), tintColor(topArgb), tintColor(bottomArgb));
         }
     }
 
     public void outline(Rect rect, int argb) {
         if (!rect.isEmpty()) {
-            graphics.outline(rect.x(), rect.y(), rect.width(), rect.height(), argb);
+            graphics.outline(rect.x(), rect.y(), rect.width(), rect.height(), tintColor(argb));
         }
     }
 
     public void horizontalLine(int x1, int x2, int y, int argb) {
-        graphics.horizontalLine(x1, x2, y, argb);
+        graphics.horizontalLine(x1, x2, y, tintColor(argb));
     }
 
     public void verticalLine(int x, int y1, int y2, int argb) {
-        graphics.verticalLine(x, y1, y2, argb);
+        graphics.verticalLine(x, y1, y2, tintColor(argb));
     }
 
-    /** Four-corner gradient, optionally through a custom GUI pipeline (for example an HSV spectrum). */
+    /**
+     * Four-corner gradient, optionally through a custom GUI pipeline (for example an HSV spectrum).
+     * Colors are modulated; pipelines using these channels as data must use an untinted canvas.
+     */
     public void gradient(RenderPipeline pipeline, Rect rect, ColorX topLeft, ColorX topRight,
                          ColorX bottomRight, ColorX bottomLeft) {
         if (rect.isEmpty()) {
@@ -92,7 +137,7 @@ public final class Canvas {
         }
         submit(new GradientQuadElementRenderState(pipeline, new Matrix3x2f(graphics.pose()),
             new ScreenRectangle(rect.x(), rect.y(), rect.width(), rect.height()), scissorArea(),
-            topLeft, topRight, bottomLeft, bottomRight));
+            tintColor(topLeft), tintColor(topRight), tintColor(bottomLeft), tintColor(bottomRight)));
     }
 
     public void gradient(Rect rect, ColorX topLeft, ColorX topRight, ColorX bottomRight, ColorX bottomLeft) {
@@ -102,7 +147,7 @@ public final class Canvas {
     /** Anti-aliasing-free thick line between two points. */
     public void line(int x0, int y0, int x1, int y1, double thickness, ColorX color) {
         submit(new LineElementRenderState(RenderPipelines.GUI, new Matrix3x2f(graphics.pose()), scissorArea(),
-            x0, y0, x1, y1, thickness, color));
+            x0, y0, x1, y1, thickness, tintColor(color)));
     }
 
     /**
@@ -113,19 +158,20 @@ public final class Canvas {
     public void polyline(float[] points, double thickness, ColorX color) {
         if (points.length >= 4) {
             submit(new PolylineElementRenderState(RenderPipelines.GUI, new Matrix3x2f(graphics.pose()), scissorArea(),
-                points.clone(), thickness, color));
+                points.clone(), thickness, tintColor(color)));
         }
     }
 
     /** Horizontal-tangent cubic Bezier between two points, as used for node graph wires. */
     public void bezier(int x0, int y0, int x1, int y1, double thickness, ColorX color, int segments) {
         submit(new BezierLineElementRenderState(RenderPipelines.GUI, new Matrix3x2f(graphics.pose()), scissorArea(),
-            x0, y0, x1, y1, thickness, color, Math.max(1, segments)));
+            x0, y0, x1, y1, thickness, tintColor(color), Math.max(1, segments)));
     }
 
     /**
      * Submits a custom GUI element. Use {@link #scissorArea()} for its scissor so
-     * it respects widget clipping.
+     * it respects widget clipping. Raw states are not recolored automatically;
+     * apply {@link #tintColor(int)} to their color inputs before construction.
      */
     public void submit(GuiElementRenderState element) {
         graphics.guiRenderState.addGuiElement(element);
@@ -145,7 +191,7 @@ public final class Canvas {
 
     public void sprite(Identifier sprite, Rect rect, int tintArgb) {
         if (!rect.isEmpty()) {
-            graphics.blitSprite(RenderPipelines.GUI_TEXTURED, sprite, rect.x(), rect.y(), rect.width(), rect.height(), tintArgb);
+            graphics.blitSprite(RenderPipelines.GUI_TEXTURED, sprite, rect.x(), rect.y(), rect.width(), rect.height(), tintColor(tintArgb));
         }
     }
 
@@ -174,7 +220,7 @@ public final class Canvas {
         }
         graphics.blit(RenderPipelines.GUI_TEXTURED, region.texture(), rect.x(), rect.y(), region.u(), region.v(),
             rect.width(), rect.height(), region.width(), region.height(),
-            region.textureWidth(), region.textureHeight(), tintArgb);
+            region.textureWidth(), region.textureHeight(), tintColor(tintArgb));
     }
 
     /** Texture region repeated 1:1 across {@code rect}; partial tiles are cropped, not squashed. */
@@ -182,6 +228,7 @@ public final class Canvas {
         if (rect.isEmpty() || region.width() <= 0 || region.height() <= 0) {
             return;
         }
+        tintArgb = tintColor(tintArgb);
         for (int y = rect.y(); y < rect.bottom(); y += region.height()) {
             int h = Math.min(region.height(), rect.bottom() - y);
             for (int x = rect.x(); x < rect.right(); x += region.width()) {
@@ -243,7 +290,7 @@ public final class Canvas {
     private void part(TextureRegion r, int x, int y, int w, int h, int u, int v, int srcW, int srcH, int tintArgb) {
         if (w > 0 && h > 0 && srcW > 0 && srcH > 0) {
             graphics.blit(RenderPipelines.GUI_TEXTURED, r.texture(), x, y, u, v, w, h, srcW, srcH,
-                r.textureWidth(), r.textureHeight(), tintArgb);
+                r.textureWidth(), r.textureHeight(), tintColor(tintArgb));
         }
     }
 
@@ -251,7 +298,7 @@ public final class Canvas {
     public void blit(RenderPipeline pipeline, TextureRegion region, Rect rect, int tintArgb) {
         graphics.blit(pipeline, region.texture(), rect.x(), rect.y(), region.u(), region.v(),
             rect.width(), rect.height(), region.width(), region.height(),
-            region.textureWidth(), region.textureHeight(), tintArgb);
+            region.textureWidth(), region.textureHeight(), tintColor(tintArgb));
     }
 
     // ---- text and items -------------------------------------------------------
@@ -269,17 +316,38 @@ public final class Canvas {
     }
 
     public void text(Component text, int x, int y, int argb, boolean shadow) {
-        graphics.text(font, text, x, y, argb, shadow);
+        text(text.getVisualOrderText(), x, y, argb, shadow);
     }
 
     public void text(FormattedCharSequence text, int x, int y, int argb, boolean shadow) {
-        graphics.text(font, text, x, y, argb, shadow);
+        graphics.text(font, tintText(text), x, y, tintColor(argb), shadow);
     }
 
     public void text(String text, int x, int y, int argb, boolean shadow) {
-        graphics.text(font, text, x, y, argb, shadow);
+        if (text != null) text(Language.getInstance().getVisualOrder(FormattedText.of(text)), x, y, argb, shadow);
     }
 
+    /** Vanilla span colors replace the default RGB; modulate them after its bidi/formatting pass. */
+    FormattedCharSequence tintText(FormattedCharSequence text) {
+        int rgbTint = ARGB.opaque(tintArgb);
+        if (rgbTint == -1) return text;
+        return sink -> {
+            // Adjacent glyphs normally share a Style. Cache per visit, without retaining mutable state in the canvas.
+            Map<Style, Style> styles = new HashMap<>();
+            return text.accept((index, style, codepoint) -> sink.accept(index,
+                styles.computeIfAbsent(style, source -> tintTextStyle(source, rgbTint)), codepoint));
+        };
+    }
+
+    private static Style tintTextStyle(Style style, int rgbTint) {
+        Style result = style;
+        if (style.getColor() != null) result = result.withColor(ARGB.multiply(style.getColor().getValue(), rgbTint) & 0xFFFFFF);
+        // Font already multiplies explicit shadow alpha by the tinted text alpha. Only RGB changes here.
+        if (style.getShadowColor() != null) result = result.withShadowColor(ARGB.multiply(style.getShadowColor(), rgbTint));
+        return result;
+    }
+
+    /** Vanilla item rendering has no RGBA input and does not inherit this view's color. */
     public void item(ItemStack stack, int x, int y) {
         graphics.item(stack, x, y);
     }
@@ -288,9 +356,19 @@ public final class Canvas {
 
     /** Clips to {@code rect} intersected with the current clip; pair with {@link #popClip()}. */
     public void pushClip(Rect rect) {
+        if (!coordinateSpaces.isEmpty()) rect = coordinateSpaces.peekLast().map(rect);
         Rect clip = clips.isEmpty() ? rect : clips.peekLast().intersect(rect);
         clips.addLast(clip);
-        graphics.enableScissor(clip.x(), clip.y(), clip.right(), clip.bottom());
+        if (coordinateSpaces.isEmpty()) graphics.enableScissor(clip.x(), clip.y(), clip.right(), clip.bottom());
+        else {
+            // Vanilla transforms scissor coordinates by the current pose. Our intersection is
+            // already in screen space, so applying that pose again would clip the wrong region.
+            graphics.pose().pushMatrix();
+            try {
+                graphics.pose().identity();
+                graphics.enableScissor(clip.x(), clip.y(), clip.right(), clip.bottom());
+            } finally { graphics.pose().popMatrix(); }
+        }
     }
 
     public void popClip() {
@@ -304,9 +382,18 @@ public final class Canvas {
     }
 
     public boolean isVisible(Rect rect) {
+        if (!coordinateSpaces.isEmpty()) rect = coordinateSpaces.peekLast().map(rect);
         Rect clip = clips.peekLast();
         return clip == null || clip.intersects(rect);
     }
+
+    /** Coordinate-aware subtree transform; unlike a paint-only transform it also maps widget clips. */
+    public void pushCoordinateSpace(UiTransform transform) {
+        UiTransform parent = coordinateSpaces.isEmpty() ? UiTransform.IDENTITY : coordinateSpaces.peekLast();
+        coordinateSpaces.addLast(parent.then(transform));
+        pushTransform((float) transform.x(), (float) transform.y(), (float) transform.scale());
+    }
+    public void popCoordinateSpace() { popTransform(); coordinateSpaces.removeLast(); }
 
     public void pushTranslation(float dx, float dy) {
         graphics.pose().pushMatrix();

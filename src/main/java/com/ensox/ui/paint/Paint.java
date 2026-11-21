@@ -7,16 +7,18 @@ import com.ensox.ui.geom.Rect;
 import net.minecraft.resources.Identifier;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Something that fills a rectangle: a background, a frame, an overlay.
  *
  * <p>Paints are values. Build them once (usually as theme constants) and reuse
  * them across widgets; combine them with {@link #then(Paint)} and
- * {@link #inset(Insets)} instead of writing new drawing code:</p>
+ * {@link #inset(Insets)} and {@link #color(ColorX)} instead of writing new drawing code:</p>
  * <pre>
  * Paint panel = Paint.asset(Textures.PANEL_FRAME)
- *     .then(Paint.color(0x80000000).inset(Insets.of(3)));
+ *     .color(ColorX.of("#7BFFFB"))
+ *     .then(Paint.fill(0x80000000).inset(Insets.of(3)));
  * </pre>
  *
  * <p>Applications add their own effects (blur, shaders) by implementing this
@@ -33,12 +35,13 @@ public interface Paint {
         return NONE;
     }
 
-    static Paint color(int argb) {
+    /** A solid fill; use {@link #color(ColorX)} to tint an existing paint. */
+    static Paint fill(int argb) {
         return (canvas, area) -> canvas.fill(area, argb);
     }
 
-    static Paint color(ColorX color) {
-        return color(color.toIntARGB());
+    static Paint fill(ColorX color) {
+        return fill(color.toIntARGB());
     }
 
     static Paint verticalGradient(ColorX top, ColorX bottom) {
@@ -58,8 +61,7 @@ public interface Paint {
     }
 
     static Paint sprite(Identifier sprite, ColorX tint) {
-        int argb = tint.toIntARGB();
-        return (canvas, area) -> canvas.sprite(sprite, area, argb);
+        return sprite(sprite).color(tint);
     }
 
     /** Library asset by key; the file and draw mode live in {@code ui/assets.json}. */
@@ -68,8 +70,7 @@ public interface Paint {
     }
 
     static Paint asset(AssetKey key, ColorX tint) {
-        int argb = tint.toIntARGB();
-        return (canvas, area) -> canvas.asset(key, area, argb);
+        return asset(key).color(tint);
     }
 
     static Paint texture(TextureRegion region) {
@@ -102,5 +103,17 @@ public interface Paint {
     /** Paints into the area shrunk by {@code insets} (negative values grow it). */
     default Paint inset(Insets insets) {
         return (canvas, area) -> paint(canvas, area.inset(insets));
+    }
+
+    /**
+     * Multiplies this paint's RGBA colors without modifying the original paint or canvas.
+     * Applied after {@link #then(Paint)}, it tints every layer; applied before it, only this layer.
+     * Repeated calls multiply their tints. Custom render states must use {@link Canvas#tintColor(int)};
+     * direct graphics access and item rendering are outside this color decorator.
+     */
+    default Paint color(ColorX tint) {
+        Objects.requireNonNull(tint, "tint");
+        if (tint.toIntARGB() == -1) return this;
+        return (canvas, area) -> paint(canvas.withColor(tint), area);
     }
 }

@@ -26,7 +26,7 @@ import com.mojang.blaze3d.platform.InputConstants;
  *     pointer moves 4px, so short clicks still reach the content; the widget
  *     that had the press receives {@code CANCEL}.</li>
  *     <li>Scrolling eases toward the target independent of frame rate, and the
- *     content is drawn with sub-pixel offset for smooth motion.</li>
+ *     displayed offset is shared by painting, clipping and hit testing.</li>
  * </ul>
  */
 public class ScrollView extends Container {
@@ -232,8 +232,8 @@ public class ScrollView extends Container {
     protected void arrangeChildren() {
         Insets padding = style().padding();
         Insets margin = content.style().margin();
-        appliedX = (int) Math.floor(currentX);
-        appliedY = (int) Math.floor(currentY);
+        appliedX = displayOffset(currentX);
+        appliedY = displayOffset(currentY);
         content.arrange(x() + padding.left() + margin.left() - appliedX, y() + padding.top() + margin.top() - appliedY);
     }
 
@@ -243,13 +243,18 @@ public class ScrollView extends Container {
         double factor = 1 - Math.exp(-SMOOTHING * deltaSeconds);
         currentX = approach(currentX, targetX, factor);
         currentY = approach(currentY, targetY, factor);
-        int nextX = (int) Math.floor(currentX);
-        int nextY = (int) Math.floor(currentY);
+        int nextX = displayOffset(currentX);
+        int nextY = displayOffset(currentY);
         if (nextX != appliedX || nextY != appliedY) {
             content.translate(appliedX - nextX, appliedY - nextY);
             appliedX = nextX;
             appliedY = nextY;
         }
+    }
+
+    private static int displayOffset(double current) {
+        // Vanilla scissors use whole GUI pixels. Move the subtree on that same grid.
+        return (int) Math.round(current);
     }
 
     private static double approach(double current, double target, double factor) {
@@ -264,11 +269,7 @@ public class ScrollView extends Container {
         if (style().clip()) {
             canvas.pushClip(viewport);
         }
-        float fracX = (float) -(currentX - Math.floor(currentX));
-        float fracY = (float) -(currentY - Math.floor(currentY));
-        canvas.pushTranslation(fracX, fracY);
         content.render(canvas, frame);
-        canvas.popTransform();
         if (style().clip()) {
             canvas.popClip();
         }

@@ -1,12 +1,12 @@
 package com.ensox.ui.widget;
 
 import com.ensox.base.Insets;
-import com.ensox.ui.core.Column;
+import com.ensox.ui.core.Container;
 import com.ensox.ui.core.Widget;
 import com.ensox.ui.event.KeyEvent;
 import com.ensox.ui.event.PointerEvent;
+import com.ensox.ui.event.UiEvent;
 import com.ensox.ui.geom.Rect;
-import com.ensox.ui.layout.Sizing;
 import com.ensox.ui.paint.Canvas;
 import com.ensox.ui.paint.Paint;
 import com.ensox.ui.paint.TextFit;
@@ -16,6 +16,7 @@ import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 import com.mojang.blaze3d.platform.InputConstants;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
@@ -26,13 +27,15 @@ import java.util.function.Supplier;
  *
  * <ul>
  *     <li>Click, Enter or Space opens the list in a {@link Popup} below or above the field.</li>
+ *     <li>A searchable Select with enough options turns its own field into the filter input while open;
+ *     the list shows only the results, the matched parts lit, and a result count.</li>
  *     <li>Up/Down change the value without opening (when focused).</li>
  *     <li>Options are re-read on every open, so lists that change at runtime
- *     (resource reloads, user presets) stay current.</li>
+ *     (resource reloads, user styles) stay current.</li>
  *     <li>Long labels are truncated, and scroll as a marquee while hovered.</li>
  * </ul>
  */
-public class Select<T> extends Widget {
+public class Select<T> extends Container {
     /** Extra content per option, drawn on the right of the label (for example a texture preview). */
     @FunctionalInterface
     public interface OptionDecoration<T> {
@@ -59,7 +62,20 @@ public class Select<T> extends Widget {
         int maxVisibleOptions,
         int optionHoverFill,
         int textColor,
-        int hoverTextColor
+        int hoverTextColor,
+        /** Magnifier painted in the field while it is the filter input. */
+        Paint searchIcon,
+        /** Matched parts of option labels while filtering. */
+        int matchColor,
+        /** Footer text and rule (escape hint, result count). */
+        int hintColor,
+        /** Left bar of the highlighted option. */
+        int highlightBarColor,
+        /**
+         * How far the list reaches past the field on each side, for popup frames whose visible edge sits
+         * inside the sprite (a glow around the rim), so the list looks exactly as wide as the field.
+         */
+        int popupOutset
     ) {
     }
 
@@ -68,6 +84,8 @@ public class Select<T> extends Widget {
     private static final int ARROW_WIDTH = 9;
     private static final int ARROW_HEIGHT = 8;
     private static final int ARROW_GAP = 4;
+    private static final int SEARCH_ICON = 11;
+    private static final int SEARCH_ICON_GAP = 3;
 
     private final Look look;
     private final Supplier<List<T>> options;
@@ -77,6 +95,13 @@ public class Select<T> extends Widget {
     private @Nullable java.util.function.Consumer<T> onChange;
     private @Nullable Supplier<Rect> visibleArea;
     private @Nullable Popup popup;
+    private @Nullable Search search;
+    /** The filter input; a child of this field only while the list is open with a search. */
+    private @Nullable TextField query;
+    private @Nullable SelectPopup<T> content;
+    private Function<T, String> searchText = String::valueOf;
+
+    private record Search(int minimumOptions, Supplier<TextField> field, Component noResults) { }
 
     public Select(Look look, Supplier<List<T>> options, Function<T, Component> label) {
         this.look = look;
@@ -109,6 +134,19 @@ public class Select<T> extends Widget {
         return this;
     }
 
+    /** Adds a fixed search field when there are at least {@code minimumOptions} choices. */
+    public Select<T> searchable(int minimumOptions, Supplier<TextField> field, Component noResults) {
+        if (minimumOptions < 1) throw new IllegalArgumentException("Search threshold must be positive");
+        search = new Search(minimumOptions, Objects.requireNonNull(field), Objects.requireNonNull(noResults));
+        return this;
+    }
+
+    /** Extra searchable text, alongside the displayed label; defaults to the option's string representation. */
+    public Select<T> searchText(Function<T, String> searchText) {
+        this.searchText = Objects.requireNonNull(searchText);
+        return this;
+    }
+
     public T value() {
         return value;
     }
@@ -134,12 +172,19 @@ public class Select<T> extends Widget {
         boolean open = isOpen();
         (isHovered() || open || isFocusVisible() ? look.fieldActive() : look.field()).paint(canvas, b);
         int arrowX = b.width() - ARROW_RIGHT;
-        Rect content = Rect.of(b.x() + CONTENT_LEFT, b.y(), arrowX - CONTENT_LEFT - ARROW_GAP, b.height());
-        paintOption(canvas, value, content, false, true);
-        (open ? look.arrowOpen() : look.arrowClosed()).paint(canvas, Rect.of(b.x() + arrowX, b.y() + 5, ARROW_WIDTH, ARROW_HEIGHT));
+        if (query != null) {
+            int iconY = b.y() + Math.floorDiv(b.height() - SEARCH_ICON, 2);
+            look.searchIcon().paint(canvas, Rect.of(b.x() + CONTENT_LEFT, iconY, SEARCH_ICON, SEARCH_ICON));
+        } else {
+            Rect content = Rect.of(b.x() + CONTENT_LEFT, b.y(), arrowX - CONTENT_LEFT - ARROW_GAP, b.height());
+            paintOption(canvas, value, content, false, true, null);
+        }
+        int arrowY = b.y() + Math.floorDiv(b.height() - ARROW_HEIGHT, 2);
+        (open ? look.arrowOpen() : look.arrowClosed()).paint(canvas, Rect.of(b.x() + arrowX, arrowY, ARROW_WIDTH, ARROW_HEIGHT));
     }
 
-    void paintOption(Canvas canvas, @Nullable T option, Rect content, boolean hovered, boolean inField) {
+    void paintOption(Canvas canvas, @Nullable T option, Rect content, boolean hovered, boolean inField,
+                     @Nullable Function<String, List<SelectOptions.Match>> matches) {
         if (option == null) {
             return;
         }
@@ -148,9 +193,22 @@ public class Select<T> extends Widget {
             int used = decoration.paint(canvas, option, content, inField);
             textRight = Math.min(textRight, content.right() - used);
         }
+        String text = label.apply(option).getString();
         int textY = content.y() + (content.height() - canvas.lineHeight()) / 2 + 1;
-        TextFit.draw(canvas, label.apply(option).getString(), content.x(), textY, textRight - content.x(),
-            hovered ? look.hoverTextColor() : look.textColor(), false, hovered);
+        int width = textRight - content.x();
+        boolean fits = canvas.textWidth(text) <= width;
+        // A label that fits never scrolls, so the matched parts can be redrawn in place.
+        TextFit.draw(canvas, text, content.x(), textY, width, hovered ? look.hoverTextColor() : look.textColor(), false,
+            hovered && !fits);
+        if (matches == null || !fits) {
+            return;
+        }
+        for (SelectOptions.Match match : matches.apply(text)) {
+            int x = content.x() + canvas.textWidth(text.substring(0, match.start()));
+            String part = text.substring(match.start(), match.end());
+            canvas.text(part, x, textY, look.matchColor(), false);
+            canvas.fill(Rect.of(x, textY + canvas.lineHeight(), Math.max(1, canvas.textWidth(part) - 1), 1), look.matchColor());
+        }
     }
 
     // ---- popup ------------------------------------------------------------------------------------
@@ -160,58 +218,86 @@ public class Select<T> extends Widget {
             popup.close();
             return;
         }
-        List<T> items = options.get();
-        Rect area = visibleArea != null ? visibleArea.get() : null;
+        var root = root();
+        if (root == null) return;
+        List<T> items = new ArrayList<>(options.get());
+        Rect area = visibleArea != null ? visibleArea.get() : Rect.of(0, 0, root.width(), root.height());
+        int contentWidth = Math.max(1, Math.min(width() + 2 * look.popupOutset(), area.width()) - look.popupPadding().horizontal());
+        Search activeSearch = search != null && items.size() >= search.minimumOptions() ? search : null;
+        int footerHeight = activeSearch == null ? 0 : SelectPopup.footerHeight(look);
         int visibleRows = Math.max(1, Math.min(look.maxVisibleOptions(), Math.max(1, items.size())));
-        int scrollHeight = visibleRows * look.optionHeight() + 6;
-        int frameExtra = look.popupPadding().vertical();
-        if (area != null) {
-            int roomDown = area.bottom() - bounds().bottom();
-            int roomUp = y() - area.y();
-            if (scrollHeight + frameExtra > roomDown && scrollHeight + frameExtra > roomUp) {
-                int room = Math.max(roomDown, roomUp);
-                int rows = Math.max(1, Math.min(visibleRows, (room - 4) / look.optionHeight()));
-                scrollHeight = rows * look.optionHeight() + 6;
-            }
+        int room = Math.max(area.bottom() - screenBounds().bottom(), screenBounds().y() - area.y());
+        int extra = look.popupPadding().vertical() + look.listPadding().vertical() + footerHeight;
+        visibleRows = Math.max(1, Math.min(visibleRows, (room - extra) / look.optionHeight()));
+        int scrollHeight = visibleRows * look.optionHeight() + look.listPadding().vertical();
+        SelectOptions<T> choices = new SelectOptions<>(items, value,
+            item -> item == null ? "" : label.apply(item).getString() + " " + Objects.toString(searchText.apply(item), ""));
+        SelectPopup<T> list = new SelectPopup<>(this, look, choices, activeSearch != null,
+            activeSearch == null ? Component.empty() : activeSearch.noResults(), contentWidth, scrollHeight, option -> {
+                // Restore the anchor before callbacks can replace its widget subtree.
+                if (popup != null) popup.close();
+                choose(option);
+            });
+        list.style().margin(Insets.of(0, -look.popupOutset(), 0, -look.popupOutset()));
+        content = list;
+        boolean keyboardFocus = isFocusVisible();
+        popup = Popup.open(this, list, visibleArea, () -> {
+            popup = null;
+            content = null;
+            closeQuery();
+            if (root() == root && root.focus().focused() == null) root.focus().focus(this, keyboardFocus);
+        });
+        Widget initialFocus = list;
+        if (activeSearch != null) {
+            TextField field = activeSearch.field().get();
+            // The field paints the frame and the magnifier; the input is only text and caret.
+            field.background(Paint.NONE, Paint.NONE).text("");
+            field.onChange(list::filter);
+            query = field;
+            add(field);
+            popup.keepOpenOn(field);
+            initialFocus = field;
         }
-
-        Column list = new Column();
-        list.style(s -> s.width(Sizing.grow()));
-        for (T item : items) {
-            list.add(new OptionRow(item));
-        }
-        ScrollView scroll = ScrollView.vertical(list)
-            .scrollbar(look.scrollbar())
-            .scrollbarThickness(look.scrollbarThickness())
-            .scrollbarOffsets(look.scrollbarCrossOffset(), look.scrollbarTrackStart(), look.scrollbarTrackEnd());
-        int scrollHeightFinal = scrollHeight;
-        scroll.style(s -> s.size(width() - 10, scrollHeightFinal).padding(look.listPadding()).background(look.list()));
-        Column frame = Column.of(scroll);
-        frame.style(s -> s.padding(look.popupPadding()).background(look.popupFrame()).overflow());
-        popup = Popup.open(this, frame, visibleArea, () -> popup = null);
+        root.layoutIfNeeded();
+        list.revealHighlighted();
+        root.focus().focus(initialFocus, keyboardFocus);
     }
 
-    private final class OptionRow extends Widget {
-        private final T option;
-
-        OptionRow(T option) {
-            this.option = option;
-            style().size(Sizing.grow(), Sizing.fixed(look.optionHeight())).cursor(CursorTypes.POINTING_HAND);
-            onClick(() -> {
-                choose(option);
-                if (popup != null) {
-                    popup.close();
-                }
-            });
+    private void closeQuery() {
+        if (query != null) {
+            TextField field = query;
+            query = null;
+            remove(field);
         }
+    }
 
-        @Override
-        protected void paint(Canvas canvas, Frame frame) {
-            Rect b = bounds();
-            if (isHovered()) {
-                canvas.fill(Rect.of(b.x() + 1, b.y(), b.width() - 2, b.height()), look.optionHoverFill());
-            }
-            paintOption(canvas, option, Rect.of(b.x() + 5, b.y(), b.width() - 10, b.height()), isHovered(), false);
+    // ---- layout of the filter input ---------------------------------------------------------------
+
+    @Override
+    protected void measureSelf(int availableWidth, int availableHeight, int spaceWidth, int spaceHeight) {
+        super.measureSelf(availableWidth, availableHeight, spaceWidth, spaceHeight);
+        if (query != null) {
+            int left = CONTENT_LEFT + SEARCH_ICON + SEARCH_ICON_GAP;
+            // The input centres its text in the content box: one pixel off the top puts it on the label's line.
+            query.style().size(Math.max(1, width() - left - ARROW_RIGHT - ARROW_GAP), height())
+                .padding(Insets.of(1, 0, 0, 0)).margin(Insets.of(0));
+            query.measure(width(), height());
+        }
+    }
+
+    @Override
+    protected void arrangeChildren() {
+        if (query != null) {
+            query.arrange(x() + CONTENT_LEFT + SEARCH_ICON + SEARCH_ICON_GAP, y());
+        }
+    }
+
+    /** While filtering, the list keys reach the open list from the input in this field. */
+    @Override
+    protected void intercept(UiEvent event) {
+        if (query != null && content != null && event instanceof KeyEvent key && key.target() == query
+            && content.handleKey(key, true)) {
+            key.consume();
         }
     }
 

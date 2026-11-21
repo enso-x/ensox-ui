@@ -8,17 +8,20 @@ import com.ensox.ui.event.KeyEvent;
 import com.ensox.ui.event.PointerEvent;
 import com.ensox.ui.geom.Rect;
 import com.ensox.ui.paint.Canvas;
+import com.ensox.ui.paint.TextFit;
 import com.mojang.blaze3d.platform.cursor.CursorTypes;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.FormattedText;
 import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundEvents;
 import org.jetbrains.annotations.Nullable;
 import com.mojang.blaze3d.platform.InputConstants;
 
 /**
- * Clickable widget with a pluggable {@link Skin} and optional text or icon.
+ * Clickable widget with a pluggable {@link Skin}, text, an icon or both.
  *
  * <ul>
  *     <li>Activates on primary-button release inside the button (moving off
@@ -57,6 +60,7 @@ public class Button extends Widget {
         !state.enabled() ? VANILLA_DISABLED : state.highlighted() ? VANILLA_HIGHLIGHTED : VANILLA, bounds);
 
     private static final int TEXT_MARGIN = 8;
+    private static final int ICON_TEXT_GAP = 4;
 
     private Skin skin = VANILLA_SKIN;
     private @Nullable Component text;
@@ -143,14 +147,15 @@ public class Button extends Widget {
     @Override
     protected int contentWidth() {
         if (icon != null) {
-            return icon.width();
+            int labelWidth = text == null ? 0 : Minecraft.getInstance().font.width(text);
+            return icon.width() + (labelWidth == 0 ? 0 : ICON_TEXT_GAP + labelWidth + TEXT_MARGIN * 2);
         }
         return text == null ? 0 : Minecraft.getInstance().font.width(text) + TEXT_MARGIN * 2;
     }
 
     @Override
     protected int contentHeight(int contentWidth) {
-        return icon != null ? icon.height() : 20;
+        return icon == null ? 20 : text == null ? icon.height() : Math.max(20, icon.height());
     }
 
     @Override
@@ -159,13 +164,38 @@ public class Button extends Widget {
         State state = state();
         skin.paint(canvas, bounds, state);
         int color = skin.contentColor(state);
-        if (icon != null) {
+        if (icon != null && text != null) {
+            paintIconAndText(canvas, bounds, color, icon, text);
+        } else if (icon != null) {
             int w = icon.width();
             int h = icon.height();
             icon.paint(canvas, Rect.of(bounds.x() + bounds.width() / 2 - w / 2, bounds.y() + bounds.height() / 2 - h / 2, w, h), color);
         } else if (text != null) {
             int textWidth = canvas.textWidth(text);
             canvas.text(text, bounds.x() + bounds.width() / 2 - textWidth / 2, bounds.y() + (bounds.height() - 8) / 2, color, true);
+        }
+    }
+
+    /** Fit before centering so a shortened label and its icon remain one visual unit. */
+    private void paintIconAndText(Canvas canvas, Rect bounds, int color, UiAsset icon, Component text) {
+        int iconWidth = icon.width();
+        int iconHeight = icon.height();
+        int available = Math.max(0, bounds.width() - TEXT_MARGIN * 2 - iconWidth - ICON_TEXT_GAP);
+        FormattedText fitted = TextFit.fit(canvas.font(), text, available);
+        int labelWidth = canvas.font().width(fitted);
+        int groupWidth = iconWidth + (labelWidth == 0 ? 0 : ICON_TEXT_GAP + labelWidth);
+        int left = bounds.x() + bounds.width() / 2 - groupWidth / 2;
+        // At tiny sizes even the icon or italic/shadow overhang may exceed the button.
+        canvas.pushClip(bounds);
+        try {
+            icon.paint(canvas, Rect.of(left, bounds.y() + bounds.height() / 2 - iconHeight / 2,
+                iconWidth, iconHeight), color);
+            if (labelWidth > 0) {
+                canvas.text(Language.getInstance().getVisualOrder(fitted), left + iconWidth + ICON_TEXT_GAP,
+                    bounds.y() + (bounds.height() - 8) / 2, color, true);
+            }
+        } finally {
+            canvas.popClip();
         }
     }
 

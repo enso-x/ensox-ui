@@ -25,8 +25,13 @@ public final class TextInput {
      */
     public static void start(Object owner, Rect area) {
         TextInputManager input = Minecraft.getInstance().textInputManager();
-        input.setTextInputArea(area.x(), area.y(), area.right(), area.bottom());
+        updateArea(area);
         input.startTextInput(owner);
+    }
+
+    /** Reposition the IME candidate area without restarting the active editing session. */
+    public static void updateArea(Rect area) {
+        Minecraft.getInstance().textInputManager().setTextInputArea(area.x(), area.y(), area.right(), area.bottom());
     }
 
     /** Turns text input off if {@code owner} turned it on. */

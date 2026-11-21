@@ -10,11 +10,12 @@ import net.minecraft.client.renderer.state.gui.GuiElementRenderState;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
 
+/** Gradient geometry stays local; bounds and scissor are in screen space, as in vanilla GUI states. */
 public record GradientQuadElementRenderState(
     RenderPipeline pipeline,
     Matrix3x2f pose,
-    ScreenRectangle bounds,
-    ScreenRectangle scissorArea,
+    ScreenRectangle rectangle,
+    @Nullable ScreenRectangle scissorArea,
     ColorX colorTL,
     ColorX colorTR,
     ColorX colorBL,
@@ -22,10 +23,10 @@ public record GradientQuadElementRenderState(
 ) implements GuiElementRenderState {
     @Override
     public void buildVertices(VertexConsumer vertices) {
-        vertices.addVertexWith2DPose(this.pose(), (float) this.bounds.left(), (float) this.bounds.top()).setColor(this.colorTL.toIntARGB());
-        vertices.addVertexWith2DPose(this.pose(), (float) this.bounds.left(), (float) this.bounds.bottom()).setColor(this.colorBL.toIntARGB());
-        vertices.addVertexWith2DPose(this.pose(), (float) this.bounds.right(), (float) this.bounds.bottom()).setColor(this.colorBR.toIntARGB());
-        vertices.addVertexWith2DPose(this.pose(), (float) this.bounds.right(), (float) this.bounds.top()).setColor(this.colorTR.toIntARGB());
+        vertices.addVertexWith2DPose(this.pose, this.rectangle.left(), this.rectangle.top()).setColor(this.colorTL.toIntARGB());
+        vertices.addVertexWith2DPose(this.pose, this.rectangle.left(), this.rectangle.bottom()).setColor(this.colorBL.toIntARGB());
+        vertices.addVertexWith2DPose(this.pose, this.rectangle.right(), this.rectangle.bottom()).setColor(this.colorBR.toIntARGB());
+        vertices.addVertexWith2DPose(this.pose, this.rectangle.right(), this.rectangle.top()).setColor(this.colorTR.toIntARGB());
     }
 
     @Override
@@ -45,6 +46,7 @@ public record GradientQuadElementRenderState(
 
     @Override
     public @Nullable ScreenRectangle bounds() {
-        return this.scissorArea != null ? this.scissorArea.intersection(this.bounds) : this.bounds;
+        ScreenRectangle screenBounds = this.rectangle.transformMaxBounds(this.pose);
+        return this.scissorArea != null ? this.scissorArea.intersection(screenBounds) : screenBounds;
     }
 }

@@ -70,14 +70,16 @@ public final class TextLineView {
             if (end > start) {
                 int x0 = box.x() + font.width(text.substring(scroll, start));
                 int x1 = box.x() + font.width(text.substring(scroll, end));
-                canvas.graphics().textHighlight(x0, textY - 1, x1, textY + 1 + font.lineHeight, true);
+                canvas.graphics().textHighlight(x0, textY - 1, x1, textY - 1 + font.lineHeight, true);
             }
         }
         boolean blinkOn = (Util.getMillis() - blinkFrom) / 300L % 2L == 0L;
         int caret = editor.caret();
         if (focused && blinkOn && caret >= scroll) {
             int caretX = box.x() + font.width(text.substring(scroll, Math.min(text.length(), caret)));
-            canvas.fill(Rect.of(Math.min(caretX, box.right() - 1), textY - 1, 1, font.lineHeight + 2), color);
+            // One pixel above the glyphs down to their descenders: vanilla's 11 px caret reached the frame of
+            // compact fields.
+            canvas.fill(Rect.of(Math.min(caretX, box.right() - 1), textY - 1, 1, font.lineHeight), color);
         }
     }
 

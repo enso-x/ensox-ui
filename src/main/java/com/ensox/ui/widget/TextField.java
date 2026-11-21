@@ -157,6 +157,7 @@ public class TextField extends Widget {
 
     @Override
     protected void paint(Canvas canvas, Frame frame) {
+        updateInputArea();
         (isFocused() ? focusedBackground : background).paint(canvas, bounds());
         Rect box = contentBounds();
         int color = isEnabled() && editor.editable() ? textColor : disabledColor;
@@ -216,10 +217,19 @@ public class TextField extends Widget {
     /** Typed characters need text input while focused ({@link TextInput}). */
     private void textInput(boolean on) {
         if (on) {
-            TextInput.start(this, contentBounds());
+            inputArea = screenTransform().map(contentBounds());
+            TextInput.start(this, inputArea);
         } else {
+            inputArea = null;
             TextInput.stop(this);
         }
+    }
+
+    private Rect inputArea;
+    private void updateInputArea() {
+        if (!isFocused()) return;
+        Rect next = screenTransform().map(contentBounds());
+        if (!next.equals(inputArea)) { inputArea = next; TextInput.updateArea(next); }
     }
 
     @Override

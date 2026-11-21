@@ -7,6 +7,7 @@ import com.ensox.ui.event.ScrollEvent;
 import com.ensox.ui.event.TextEvent;
 import com.ensox.ui.event.UiEvent;
 import com.ensox.ui.geom.Rect;
+import com.ensox.ui.geom.UiTransform;
 import com.ensox.ui.paint.Canvas;
 import com.ensox.ui.state.Signal;
 import com.ensox.ui.state.Subscription;
@@ -63,13 +64,13 @@ public abstract class Widget {
     }
 
     /**
-     * Applies style presets and returns this widget, so construction stays one
+     * Applies style styles and returns this widget, so construction stays one
      * expression: {@code Label.of(text).style(TITLE, s -> s.margin(...))}.
      */
     @SafeVarargs
     @SuppressWarnings("unchecked")
-    public final <W extends Widget> W style(Consumer<Style>... presets) {
-        style.apply(presets);
+    public final <W extends Widget> W style(Consumer<Style>... styles) {
+        style.apply(styles);
         return (W) this;
     }
 
@@ -156,10 +157,14 @@ public abstract class Widget {
 
     /** Requests a new layout pass before the next frame. Cheap; safe to call often. */
     public void invalidateLayout() {
+        for (Widget ancestor = parent; ancestor != null; ancestor = ancestor.parent) ancestor.descendantLayoutInvalidated();
         if (root != null) {
             root.requestLayout();
         }
     }
+
+    /** Cached layout boundaries can invalidate their measurement when any descendant changes. */
+    protected void descendantLayoutInvalidated() { }
 
     // ---- state binding -------------------------------------------------------------
 
@@ -221,6 +226,14 @@ public abstract class Widget {
     public Rect bounds() {
         return new Rect(x, y, width, height);
     }
+
+    /** Only transformed containers introduce a new space; ordinary widgets keep absolute GUI coordinates. */
+    protected UiTransform childTransform() { return UiTransform.IDENTITY; }
+    public final UiTransform screenTransform() {
+        return parent == null ? UiTransform.IDENTITY : parent.screenTransform().then(parent.childTransform());
+    }
+    /** Anchor overlays in screen space even when the field lives in a zoomable canvas. */
+    public final Rect screenBounds() { return screenTransform().map(bounds()); }
 
     /** Border box shrunk by padding. */
     public Rect contentBounds() {
