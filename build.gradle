@@ -7,9 +7,45 @@ plugins {
 // gradlew publishLibrary: tests, then all three artifacts into the Maven directory given by
 // -PmavenDir=<dir> or ENSOX_MAVEN_DIR (a checkout of the enso-x/maven Pages repository).
 // Without either, it publishes into build/maven for a look at the result.
+def mavenDir = providers.gradleProperty('mavenDir').orElse(providers.environmentVariable('ENSOX_MAVEN_DIR'))
+    .map { file(it) }.orElse(layout.buildDirectory.dir('maven').map { it.asFile })
+
+// The enso-x Maven repository keeps text files with LF line endings, and checksums cover those
+// bytes. Gradle writes POMs and maven-metadata.xml with the platform separator (CRLF on Windows),
+// so after publishing the text files of our group are converted to LF and their checksums rewritten.
+def normalizeLineEndings = tasks.register('normalizeMavenLineEndings') {
+    group = 'ensox ui'
+    description = 'Converts published POM/metadata/module files of com.ensox.ui to LF and rewrites their checksums.'
+    doLast {
+        def groupDir = new File(mavenDir.get(), project.group.toString().replace('.', '/'))
+        if (!groupDir.isDirectory()) {
+            return
+        }
+        def digests = [md5: 'MD5', sha1: 'SHA-1', sha256: 'SHA-256', sha512: 'SHA-512']
+        groupDir.eachFileRecurse(groovy.io.FileType.FILES) { File f ->
+            if (!(f.name ==~ /.*\.(pom|xml|module)/)) {
+                return
+            }
+            byte[] bytes = f.bytes
+            byte[] lf = new String(bytes, 'UTF-8').replace('\r\n', '\n').getBytes('UTF-8')
+            if (lf != bytes) {
+                f.bytes = lf
+            }
+            digests.each { ext, algorithm ->
+                def sum = new File(f.path + '.' + ext)
+                if (sum.isFile()) {
+                    def hex = java.security.MessageDigest.getInstance(algorithm).digest(lf).encodeHex().toString()
+                    sum.text = hex
+                }
+            }
+        }
+    }
+}
+
 tasks.register('publishLibrary') {
     group = 'ensox ui'
     description = 'Tests and publishes ensox-ui-common, -fabric and -neoforge to the enso-x Maven directory.'
     dependsOn ':common:test'
     dependsOn(['common', 'fabric', 'neoforge'].collect { ":$it:publishMavenJavaPublicationToEnsoxRepository" })
+    finalizedBy normalizeLineEndings
 }
