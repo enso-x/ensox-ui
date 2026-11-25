@@ -8,6 +8,8 @@ import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Vanilla {@link Screen} hosting a widget tree. This is the only integration
@@ -44,7 +46,7 @@ public abstract class UiScreen extends Screen {
     @Override
     protected void init() {
         if (root == null) {
-            root = new UiRoot(build());
+            root = new UiRoot(build()).tooltipStyle(tooltipStyle());
         } else if (!root.content().isAttached()) {
             root.attach();
         }
@@ -57,6 +59,14 @@ public abstract class UiScreen extends Screen {
             root.detach();
         }
         super.removed();
+    }
+
+    /**
+     * Sprite style of this screen's widget tooltips ({@code null}: vanilla), see
+     * {@link UiRoot#tooltipStyle(Identifier)}. Mods override it in their base screen.
+     */
+    protected @Nullable Identifier tooltipStyle() {
+        return null;
     }
 
     /**

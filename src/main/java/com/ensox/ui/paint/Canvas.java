@@ -206,13 +206,6 @@ public final class Canvas {
         }
     }
 
-    /** Icon by short name ({@code icon/<name>} in the library default namespace). */
-    public void icon(String name, Rect rect, int tintArgb) {
-        if (!rect.isEmpty()) {
-            AssetLibrary.icon(name).paint(this, rect, tintArgb);
-        }
-    }
-
     /** Texture region scaled to {@code rect}. */
     public void texture(TextureRegion region, Rect rect, int tintArgb) {
         if (rect.isEmpty() || region.width() <= 0 || region.height() <= 0) {

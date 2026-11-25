@@ -16,11 +16,19 @@ public record AssetKey(Identifier id) {
         return new AssetKey(Identifier.fromNamespaceAndPath(namespace, path));
     }
 
-    /** {@code "namespace:path"}; a bare path uses the library default namespace. */
-    public static AssetKey parse(String key) {
+    /**
+     * Icon by short name: {@code <namespace>:icon/<name>}. There is no library-wide default
+     * namespace (several mods share the library), so callers name theirs.
+     */
+    public static AssetKey icon(String namespace, String name) {
+        return of(namespace, "icon/" + name);
+    }
+
+    /** {@code "namespace:path"}; a bare path uses {@code defaultNamespace}. */
+    public static AssetKey parse(String key, String defaultNamespace) {
         return new AssetKey(key.indexOf(':') >= 0
             ? Identifier.parse(key)
-            : Identifier.fromNamespaceAndPath(AssetLibrary.defaultNamespace(), key));
+            : Identifier.fromNamespaceAndPath(defaultNamespace, key));
     }
 
     @Override

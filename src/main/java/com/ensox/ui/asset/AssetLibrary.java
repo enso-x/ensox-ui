@@ -40,27 +40,17 @@ public final class AssetLibrary {
     private static volatile List<Map.Entry<String, AssetDefinitions.Definition>> patterns = List.of();
     private static final Map<AssetKey, UiAsset> resolved = new ConcurrentHashMap<>();
     private static final Set<AssetKey> reportedMissing = ConcurrentHashMap.newKeySet();
-    private static String defaultNamespace = "minecraft";
 
     private AssetLibrary() {
-    }
-
-    /** Namespace used for bare keys ({@link AssetKey#parse}, icon names). Set once by the host mod. */
-    public static void defaultNamespace(String namespace) {
-        defaultNamespace = namespace;
-    }
-
-    public static String defaultNamespace() {
-        return defaultNamespace;
     }
 
     public static UiAsset get(AssetKey key) {
         return resolved.computeIfAbsent(key, AssetLibrary::resolve);
     }
 
-    /** Icon by short name: key {@code <default namespace>:icon/<name>}. */
-    public static UiAsset icon(String name) {
-        return get(AssetKey.of(defaultNamespace, "icon/" + name));
+    /** Icon by short name: key {@code <namespace>:icon/<name>}, see {@link AssetKey#icon}. */
+    public static UiAsset icon(String namespace, String name) {
+        return get(AssetKey.icon(namespace, name));
     }
 
     private static UiAsset resolve(AssetKey key) {

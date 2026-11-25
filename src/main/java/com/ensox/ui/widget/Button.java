@@ -79,10 +79,6 @@ public class Button extends Widget {
         return new Button().text(text).onPress(action);
     }
 
-    public static Button icon(String iconName, Runnable action) {
-        return new Button().icon(AssetLibrary.icon(iconName)).onPress(action);
-    }
-
     public static Button icon(AssetKey icon, Runnable action) {
         return new Button().icon(AssetLibrary.get(icon)).onPress(action);
     }

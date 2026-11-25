@@ -40,9 +40,6 @@ import java.util.function.Supplier;
 public final class UiRoot {
     /** Widest widget tooltip line before it wraps. */
     private static final int TOOLTIP_WIDTH = 200;
-    /** Sprite style of widget tooltips (vanilla's {@code <ns>:tooltip/<path>_background} and {@code _frame}). */
-    private static @Nullable Identifier tooltipStyle;
-
     private final Widget content;
     private final List<Overlay> overlays = new ArrayList<>();
     private final FocusManager focus = new FocusManager(this);
@@ -58,6 +55,8 @@ public final class UiRoot {
     private @Nullable Widget hovered;
     private @Nullable Widget captured;
     private int capturedButton = -1;
+    /** Sprite style of widget tooltips (vanilla's {@code <ns>:tooltip/<path>_background} and {@code _frame}). */
+    private @Nullable Identifier tooltipStyle;
 
     public UiRoot(Widget content) {
         this.content = content;
@@ -200,11 +199,16 @@ public final class UiRoot {
     }
 
     /**
-     * Styles every widget tooltip with the theme's sprites ({@code null}: vanilla). Item tooltips drawn by
-     * the game keep their own style.
+     * Styles every widget tooltip of this root with the theme's sprites ({@code null}: vanilla). Item
+     * tooltips drawn by the game keep their own style. Per root, not global: several mods share the library.
      */
-    public static void tooltipStyle(@Nullable Identifier style) {
-        tooltipStyle = style;
+    public UiRoot tooltipStyle(@Nullable Identifier style) {
+        this.tooltipStyle = style;
+        return this;
+    }
+
+    public @Nullable Identifier tooltipStyle() {
+        return tooltipStyle;
     }
 
     // ---- frame -------------------------------------------------------------------------
