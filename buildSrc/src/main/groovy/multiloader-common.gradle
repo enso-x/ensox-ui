@@ -1,0 +1,98 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+}
+
+base {
+    // ensox-ui-common, ensox-ui-fabric, ensox-ui-neoforge; the version carries the Minecraft version.
+    archivesName = "ensox-ui-${project.name}"
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(java_version)
+    // MIT library: consumers get the sources in their IDE.
+    withSourcesJar()
+}
+
+repositories {
+    mavenCentral()
+}
+
+['apiElements', 'runtimeElements'].each { variant ->
+    publishing.publications.configureEach {
+        suppressPomMetadataWarningsFor(variant)
+    }
+}
+
+jar {
+    from(rootProject.file('LICENSE')) {
+        rename { "${it}_${mod_id}" }
+    }
+    manifest {
+        attributes([
+                'Specification-Title'   : mod_name,
+                'Specification-Vendor'  : mod_author,
+                'Specification-Version' : project.jar.archiveVersion,
+                'Implementation-Title'  : project.name,
+                'Implementation-Version': project.jar.archiveVersion,
+                'Implementation-Vendor' : mod_author,
+                'Built-On-Minecraft'    : minecraft_version
+        ])
+    }
+}
+
+processResources {
+    var expandProps = [
+            'version'                      : version,
+            'group'                        : project.group,
+            'minecraft_version'            : minecraft_version,
+            'minecraft_version_range'      : minecraft_version_range,
+            'fabric_loader_version'        : fabric_loader_version,
+            'mod_name'                     : mod_name,
+            'mod_author'                   : mod_author,
+            'mod_homepage'                 : mod_homepage,
+            'mod_id'                       : mod_id,
+            'license'                      : license,
+            'description'                  : rootProject.property('description'),
+            'neoforge_version'             : neoforge_version,
+            'neoforge_loader_version_range': neoforge_loader_version_range,
+            'credits'                      : credits,
+            'java_version'                 : java_version
+    ]
+    var jsonExpandProps = expandProps.collectEntries {
+        key, value -> [(key): value instanceof String ? value.replace("\n", "\\\\n") : value]
+    }
+    filesMatching(['META-INF/neoforge.mods.toml']) {
+        expand expandProps
+    }
+    filesMatching(['pack.mcmeta', 'fabric.mod.json']) {
+        expand jsonExpandProps
+    }
+    inputs.properties(expandProps)
+}
+
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) {
+            artifactId base.archivesName.get()
+            from components.java
+            pom {
+                name = "${mod_name} (${project.name})"
+                licenses {
+                    license {
+                        name = 'MIT'
+                        url = 'https://opensource.org/license/mit'
+                    }
+                }
+            }
+        }
+    }
+    repositories {
+        // The enso-x/maven Pages checkout (-PmavenDir or ENSOX_MAVEN_DIR); build/maven otherwise.
+        maven {
+            name = 'ensox'
+            def dir = providers.gradleProperty('mavenDir').orElse(providers.environmentVariable('ENSOX_MAVEN_DIR'))
+            url = dir.isPresent() ? file(dir.get()).toURI() : rootProject.layout.buildDirectory.dir('maven').get().asFile.toURI()
+        }
+    }
+}

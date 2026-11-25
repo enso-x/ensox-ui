@@ -3,6 +3,7 @@ package com.ensox.ui.asset;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.resources.PreparableReloadListener;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
 import org.slf4j.Logger;
@@ -28,8 +29,9 @@ import java.util.concurrent.Executor;
  * can override single keys of a mod. See {@link AssetDefinitions} for the
  * file format and path rules.</p>
  *
- * <p>The host mod forwards resource reloads to {@link #reload}; after F3+T
- * every key resolves against the new files without touching code.</p>
+ * <p>The library reloads it itself ({@link AssetReloadListener}, registered by
+ * the loader entry points); after F3+T every key resolves against the new
+ * files without touching code. Mods only ship their {@code ui/assets.json}.</p>
  */
 public final class AssetLibrary {
     private static final Logger LOGGER = LoggerFactory.getLogger("EnsoxUI/Assets");
@@ -70,8 +72,11 @@ public final class AssetLibrary {
         return new UiAsset.Missing(key);
     }
 
-    public static CompletableFuture<Void> reload(ResourceManager resources, Executor prepareExecutor, Executor applyExecutor) {
+    /** Reads every {@code ui/assets.json} off-thread, then swaps the definitions in after the barrier. */
+    static CompletableFuture<Void> reload(ResourceManager resources, Executor prepareExecutor,
+                                          PreparableReloadListener.PreparationBarrier barrier, Executor applyExecutor) {
         return CompletableFuture.supplyAsync(() -> load(resources), prepareExecutor)
+            .thenCompose(barrier::wait)
             .thenAcceptAsync(AssetLibrary::apply, applyExecutor);
     }
 

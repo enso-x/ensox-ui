@@ -1,0 +1,42 @@
+// Ensox UI shared code: widgets, layout, painting, input (packages com.ensox.base and com.ensox.ui).
+// Depends only on Minecraft (Mojang names). The loader projects compile these sources into their jars;
+// the published ensox-ui-common jar is for the common projects of consuming mods (compileOnly).
+plugins {
+    id 'multiloader-common'
+    id 'net.neoforged.moddev'
+}
+
+neoForge {
+    neoFormVersion = neo_form_version
+    // GuiGraphicsExtractor.guiRenderState / scissorStack (custom GUI elements). At runtime NeoForge
+    // applies this file and Fabric ensox_ui.accesswidener with the same entries.
+    accessTransformers.from(file('src/main/resources/META-INF/accesstransformer.cfg').absolutePath)
+}
+
+dependencies {
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+configurations {
+    testCompileClasspath.extendsFrom(modDevCompileDependencies)
+    testRuntimeClasspath.extendsFrom(modDevCompileDependencies)
+    commonJava {
+        canBeResolved = false
+        canBeConsumed = true
+    }
+    commonResources {
+        canBeResolved = false
+        canBeConsumed = true
+    }
+}
+
+artifacts {
+    commonJava sourceSets.main.java.sourceDirectories.singleFile
+    commonResources sourceSets.main.resources.sourceDirectories.singleFile
+}

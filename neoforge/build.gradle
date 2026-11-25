@@ -1,0 +1,20 @@
+plugins {
+    id 'multiloader-loader'
+    id 'net.neoforged.moddev'
+}
+
+neoForge {
+    version = neoforge_version
+    accessTransformers.from(project(':common').file('src/main/resources/META-INF/accesstransformer.cfg').absolutePath)
+    runs {
+        client {
+            client()
+            ideName = 'NeoForge Client (Ensox UI)'
+        }
+    }
+    mods {
+        "${mod_id}" {
+            sourceSet sourceSets.main
+        }
+    }
+}
