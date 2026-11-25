@@ -4,8 +4,8 @@ Widget, layout and painting framework for Minecraft screens (Fabric and NeoForge
 A library mod (`ensox_ui`): it does nothing on its own. Used by LootBeamsUp and Smithery.
 License: MIT.
 
-Framework guide (widgets, layout, input, assets): see `docs/ensox-ui.md` in LootBeamsUp
-until it moves here.
+Source: https://github.com/enso-x/ensox-ui. A full framework guide (widgets, layout,
+input, assets) will move here from LootBeamsUp's internal docs.
 
 ## Layout
 
