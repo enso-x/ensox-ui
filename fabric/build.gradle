@@ -16,7 +16,7 @@ loom {
     runs {
         client {
             client()
-            setConfigName('Fabric Client (Ensox UI)')
+            setConfigName('Fabric Client (EnsoX UI)')
             ideConfigGenerated(true)
             runDir('runs/client')
         }

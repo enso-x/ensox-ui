@@ -34,7 +34,7 @@ import java.util.concurrent.Executor;
  * files without touching code. Mods only ship their {@code ui/assets.json}.</p>
  */
 public final class AssetLibrary {
-    private static final Logger LOGGER = LoggerFactory.getLogger("EnsoxUI/Assets");
+    private static final Logger LOGGER = LoggerFactory.getLogger("EnsoXUI/Assets");
     private static final Identifier FILE = Identifier.fromNamespaceAndPath("minecraft", "ui/assets.json");
 
     private static volatile Map<String, AssetDefinitions.Definition> exact = Map.of();

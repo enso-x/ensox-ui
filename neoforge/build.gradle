@@ -9,7 +9,7 @@ neoForge {
     runs {
         client {
             client()
-            ideName = 'NeoForge Client (Ensox UI)'
+            ideName = 'NeoForge Client (EnsoX UI)'
         }
     }
     mods {

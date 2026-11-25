@@ -1,6 +1,6 @@
 package com.ensox.ui.asset;
 
-import com.ensox.ui.EnsoxUi;
+import com.ensox.ui.EnsoXUi;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.resources.PreparableReloadListener;
 
@@ -13,7 +13,7 @@ import java.util.concurrent.Executor;
  * reloads (a mod that only ships {@code ui/assets.json}).
  */
 public final class AssetReloadListener implements PreparableReloadListener {
-    public static final Identifier ID = EnsoxUi.id("assets");
+    public static final Identifier ID = EnsoXUi.id("assets");
 
     @Override
     public CompletableFuture<Void> reload(SharedState sharedState, Executor prepareExecutor,

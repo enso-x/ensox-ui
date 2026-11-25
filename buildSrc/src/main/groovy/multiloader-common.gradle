@@ -90,7 +90,7 @@ publishing {
     repositories {
         // The enso-x/maven Pages checkout (-PmavenDir or ENSOX_MAVEN_DIR); build/maven otherwise.
         maven {
-            name = 'ensox'
+            name = 'ensoX'
             def dir = providers.gradleProperty('mavenDir').orElse(providers.environmentVariable('ENSOX_MAVEN_DIR'))
             url = dir.isPresent() ? file(dir.get()).toURI() : rootProject.layout.buildDirectory.dir('maven').get().asFile.toURI()
         }

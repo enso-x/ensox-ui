@@ -14,7 +14,7 @@ def mavenDir = providers.gradleProperty('mavenDir').orElse(providers.environment
 // bytes. Gradle writes POMs and maven-metadata.xml with the platform separator (CRLF on Windows),
 // so after publishing the text files of our group are converted to LF and their checksums rewritten.
 def normalizeLineEndings = tasks.register('normalizeMavenLineEndings') {
-    group = 'ensox ui'
+    group = 'EnsoX UI'
     description = 'Converts published POM/metadata/module files of com.ensox.ui to LF and rewrites their checksums.'
     doLast {
         def groupDir = new File(mavenDir.get(), project.group.toString().replace('.', '/'))
@@ -43,9 +43,9 @@ def normalizeLineEndings = tasks.register('normalizeMavenLineEndings') {
 }
 
 tasks.register('publishLibrary') {
-    group = 'ensox ui'
+    group = 'EnsoX UI'
     description = 'Tests and publishes ensox-ui-common, -fabric and -neoforge to the enso-x Maven directory.'
     dependsOn ':common:test'
-    dependsOn(['common', 'fabric', 'neoforge'].collect { ":$it:publishMavenJavaPublicationToEnsoxRepository" })
+    dependsOn(['common', 'fabric', 'neoforge'].collect { ":$it:publishMavenJavaPublicationToEnsoXRepository" })
     finalizedBy normalizeLineEndings
 }

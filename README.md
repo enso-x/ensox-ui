@@ -1,4 +1,4 @@
-# Ensox UI
+# EnsoX UI
 
 Widget, layout and painting framework for Minecraft screens (Fabric and NeoForge).
 A library mod (`ensox_ui`): it does nothing on its own. Used by LootBeamsUp and Smithery.
@@ -24,13 +24,13 @@ Repository `https://enso-x.github.io/maven/`, group `com.ensox.ui`:
 
 ```groovy
 // common project
-compileOnly "com.ensox.ui:ensox-ui-common:1.0.0+26.3"
+compileOnly "com.ensox.ui:ensox-ui-common:1.0.1+26.3"
 // Fabric
-implementation "com.ensox.ui:ensox-ui-fabric:1.0.0+26.3"
-include "com.ensox.ui:ensox-ui-fabric:1.0.0+26.3"
+implementation "com.ensox.ui:ensox-ui-fabric:1.0.1+26.3"
+include "com.ensox.ui:ensox-ui-fabric:1.0.1+26.3"
 // NeoForge
-implementation "com.ensox.ui:ensox-ui-neoforge:1.0.0+26.3"
-jarJar "com.ensox.ui:ensox-ui-neoforge:1.0.0+26.3"
+implementation "com.ensox.ui:ensox-ui-neoforge:1.0.1+26.3"
+jarJar "com.ensox.ui:ensox-ui-neoforge:1.0.1+26.3"
 ```
 
 Declare the dependency in the mod metadata (`"ensox_ui": ">=1.0.0"` in `fabric.mod.json`,

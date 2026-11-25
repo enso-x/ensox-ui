@@ -6,7 +6,7 @@ import net.fabricmc.fabric.api.resource.v1.ResourceLoader;
 import net.minecraft.server.packs.PackType;
 
 /** Fabric client entry point: the library reloads its UI assets itself. */
-public final class EnsoxUiFabricClient implements ClientModInitializer {
+public final class EnsoXUiFabricClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         ResourceLoader.get(PackType.CLIENT_RESOURCES)

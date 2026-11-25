@@ -1,4 +1,4 @@
-// Ensox UI shared code: widgets, layout, painting, input (packages com.ensox.base and com.ensox.ui).
+// EnsoX UI shared code: widgets, layout, painting, input (packages com.ensox.base and com.ensox.ui).
 // Depends only on Minecraft (Mojang names). The loader projects compile these sources into their jars;
 // the published ensox-ui-common jar is for the common projects of consuming mods (compileOnly).
 plugins {

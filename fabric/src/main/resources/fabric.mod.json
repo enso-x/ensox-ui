@@ -14,7 +14,7 @@
     "environment": "*",
     "entrypoints": {
         "client": [
-            "com.ensox.ui.fabric.EnsoxUiFabricClient"
+            "com.ensox.ui.fabric.EnsoXUiFabricClient"
         ]
     },
     "accessWidener": "${mod_id}.accesswidener",
