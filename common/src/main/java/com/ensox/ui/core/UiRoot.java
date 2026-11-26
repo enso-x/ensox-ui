@@ -225,7 +225,8 @@ public final class UiRoot {
         Canvas canvas = new Canvas(graphics);
         Widget.Frame frame = new Widget.Frame(mouseX, mouseY, partialTick, deltaSeconds);
         content.render(canvas, frame);
-        for (Overlay overlay : overlays) {
+        // A copy: a widget may open or close a layer while it renders (shown from the next frame).
+        for (Overlay overlay : List.copyOf(overlays)) {
             graphics.nextStratum();
             overlay.widget.render(canvas, frame);
         }
@@ -265,7 +266,7 @@ public final class UiRoot {
         }
         layoutDirty = false;
         layoutLayer(content);
-        for (Overlay overlay : overlays) {
+        for (Overlay overlay : List.copyOf(overlays)) {
             layoutLayer(overlay.widget);
         }
     }

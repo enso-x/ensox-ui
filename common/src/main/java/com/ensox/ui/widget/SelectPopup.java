@@ -51,6 +51,8 @@ final class SelectPopup<T> extends Column {
     private double pointerX;
     private double pointerY;
     private long crossingSince = -1;
+    /** Ends the frame task of an earlier attachment. */
+    private int attachments;
 
     SelectPopup(Select<T> owner, Select.Look look, SelectOptions<T> options, boolean filtered,
                 Component noResults, int contentWidth, int scrollHeight, Consumer<T> choose) {
@@ -238,14 +240,22 @@ final class SelectPopup<T> extends Column {
     }
 
     @Override
-    protected void onDetach() {
-        closeSubmenu(false);
+    protected void onAttach() {
+        // Hover intent runs at the start of a frame, before layout and rendering: it opens and closes
+        // overlays, which must not happen while the root walks its layers.
+        int generation = ++attachments;
+        UiRoot root = root();
+        if (root != null) root.animations().add(delta -> {
+            if (generation != attachments || root() != root) return false;
+            if (rows.isTree()) followPointer(System.nanoTime());
+            return true;
+        });
     }
 
     @Override
-    protected void renderChildren(Canvas canvas, Frame frame) {
-        super.renderChildren(canvas, frame);
-        if (rows.isTree()) followPointer(System.nanoTime());
+    protected void onDetach() {
+        attachments++;
+        closeSubmenu(false);
     }
 
     /** Hover switches the submenu, except while the pointer crosses rows on its way into the open one. */

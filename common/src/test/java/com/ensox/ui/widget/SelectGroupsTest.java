@@ -116,6 +116,32 @@ class SelectGroupsTest {
         assertEquals(list.right() - LOOK.popupOutset(), sub.x());
     }
 
+    @Test void hoverOpensAndSwitchesSubmenusAtTheStartOfAFrame() {
+        Select<String> select = Select.of(Signal.of("itemId"), () -> OPTIONS, Component::literal, LOOK).grouped(GROUPS::get);
+        UiRoot root = root(select);
+        root.focus().focus(select, true);
+        root.keyPressed(key(InputConstants.KEY_RETURN));
+        root.layoutIfNeeded();
+        Rect list = ((Popup) root.overlays().getFirst().widget()).children().getFirst().screenBounds();
+        int firstRow = list.y() + LOOK.popupPadding().top() + LOOK.listPadding().top();
+        double x = list.x() + 20;
+        root.pointerMoved(x, firstRow + 10);          // Item
+        frame(root);
+        assertEquals(2, root.overlays().size(), "hovering a category opens its submenu");
+        root.pointerMoved(x, firstRow + LOOK.optionHeight() + 10);   // Selector, straight down: not towards the submenu
+        frame(root);
+        assertEquals(1, root.overlays().size(), "hovering an option closes the submenu");
+        root.pointerMoved(x, firstRow + 2 * LOOK.optionHeight() + 10);   // Smithery
+        frame(root);
+        assertEquals(2, root.overlays().size());
+    }
+
+    /** What UiRoot.render does before layout and painting (rendering needs a game window). */
+    private static void frame(UiRoot root) {
+        List.copyOf(root.animations()).forEach(task -> { if (!task.tick(0)) root.animations().remove(task); });
+        root.layoutIfNeeded();
+    }
+
     @Test void thePointerPathTowardsTheSubmenuIsATriangle() {
         Rect submenu = Rect.of(100, 40, 80, 60);
         assertTrue(SelectPopup.towardSubmenu(60, 50, 80, 60, submenu), "heading down-right into the submenu");
