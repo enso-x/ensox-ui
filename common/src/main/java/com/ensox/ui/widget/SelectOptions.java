@@ -29,6 +29,9 @@ final class SelectOptions<T> {
     }
 
     List<T> visible() { return visible.stream().map(Entry::value).toList(); }
+    List<T> all() { return all.stream().map(Entry::value).toList(); }
+    /** True while a non-blank query narrows the list. */
+    boolean isFiltering() { return terms.length > 0; }
     int highlightedIndex() { return highlighted; }
     @Nullable T highlighted() { return highlighted < 0 ? null : visible.get(highlighted).value(); }
 

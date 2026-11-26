@@ -27,13 +27,21 @@ public final class Popup extends Container {
     private final Widget content;
     private final Supplier<Rect> visibleArea;
     private final boolean alignRight;
+    /** Beside placement (submenus): the widget whose side edges the popup sits against; null below/above. */
+    private final @Nullable Widget sideOf;
+    private final int sideOverlap;
+    private final int sideTop;
     private @Nullable UiRoot.Overlay overlay;
 
-    private Popup(Widget anchor, Widget content, Supplier<Rect> visibleArea, boolean alignRight) {
+    private Popup(Widget anchor, Widget content, Supplier<Rect> visibleArea, boolean alignRight,
+                  @Nullable Widget sideOf, int sideOverlap, int sideTop) {
         this.anchor = anchor;
         this.content = content;
         this.visibleArea = visibleArea;
         this.alignRight = alignRight;
+        this.sideOf = sideOf;
+        this.sideOverlap = sideOverlap;
+        this.sideTop = sideTop;
         add(content);
         style().overflow();
     }
@@ -54,7 +62,25 @@ public final class Popup extends Container {
             throw new IllegalStateException("Popup anchor is not attached");
         }
         Supplier<Rect> area = visibleArea != null ? visibleArea : () -> Rect.of(0, 0, root.width(), root.height());
-        Popup popup = new Popup(anchor, content, area, alignRight);
+        Popup popup = new Popup(anchor, content, area, alignRight, null, 0, 0);
+        popup.overlay = root.openOverlay(popup, true, onClose);
+        return popup;
+    }
+
+    /**
+     * Opens a submenu beside {@code sideOf} (usually the list holding {@code anchor}): right of it when it fits,
+     * otherwise left; its top at the anchor's top plus {@code top}, moved up when it would leave the area.
+     *
+     * @param overlap how far the popup reaches over {@code sideOf}'s edge (frames with a glow outside the rim)
+     */
+    public static Popup openBeside(Widget anchor, Widget sideOf, Widget content, @Nullable Supplier<Rect> visibleArea,
+                                   @Nullable Runnable onClose, int overlap, int top) {
+        UiRoot root = anchor.root();
+        if (root == null) {
+            throw new IllegalStateException("Popup anchor is not attached");
+        }
+        Supplier<Rect> area = visibleArea != null ? visibleArea : () -> Rect.of(0, 0, root.width(), root.height());
+        Popup popup = new Popup(anchor, content, area, false, sideOf, overlap, top);
         popup.overlay = root.openOverlay(popup, true, onClose);
         return popup;
     }
@@ -94,6 +120,9 @@ public final class Popup extends Container {
     }
 
     private Rect placement() {
+        if (sideOf != null) {
+            return besidePlacement();
+        }
         Rect area = visibleArea.get();
         Rect a = anchor.screenBounds();
         int w = content.outerWidth();
@@ -105,6 +134,22 @@ public final class Popup extends Container {
         int roomDown = area.bottom() - below;
         int roomUp = a.y() - area.y();
         int y = h <= roomDown ? below : h <= roomUp ? above : (roomDown >= roomUp ? below : above);
+        y = Math.max(area.y(), Math.min(y, area.bottom() - h));
+        return Rect.of(x + content.style().margin().left(), y + content.style().margin().top(), w, h);
+    }
+
+    private Rect besidePlacement() {
+        Rect area = visibleArea.get();
+        Rect side = sideOf.screenBounds();
+        int w = content.outerWidth();
+        int h = content.outerHeight();
+        int right = side.right() - sideOverlap;
+        int left = side.x() + sideOverlap - w;
+        int roomRight = area.right() - right;
+        int roomLeft = left + w - area.x();
+        int x = w <= roomRight ? right : w <= roomLeft ? left : roomRight >= roomLeft ? right : left;
+        x = Math.max(area.x(), Math.min(x, area.right() - w));
+        int y = anchor.screenBounds().y() + sideTop;
         y = Math.max(area.y(), Math.min(y, area.bottom() - h));
         return Rect.of(x + content.style().margin().left(), y + content.style().margin().top(), w, h);
     }

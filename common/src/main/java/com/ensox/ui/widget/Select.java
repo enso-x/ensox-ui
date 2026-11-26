@@ -33,6 +33,9 @@ import java.util.function.Supplier;
  *     <li>Options are re-read on every open, so lists that change at runtime
  *     (resource reloads, user styles) stay current.</li>
  *     <li>Long labels are truncated, and scroll as a marquee while hovered.</li>
+ *     <li>A grouped Select ({@link #grouped}) lists categories; each opens its options in a submenu beside
+ *     the list. Filtering flattens the tree into "category › option" results, and the closed field shows
+ *     the value's path the same way.</li>
  * </ul>
  */
 public class Select<T> extends Container {
@@ -100,6 +103,8 @@ public class Select<T> extends Container {
     private @Nullable TextField query;
     private @Nullable SelectPopup<T> content;
     private Function<T, String> searchText = String::valueOf;
+    private @Nullable Function<T, SelectGroup> grouping;
+    private @Nullable Widget popupFocus;
 
     private record Search(int minimumOptions, Supplier<TextField> field, Component noResults) { }
 
@@ -147,6 +152,15 @@ public class Select<T> extends Container {
         return this;
     }
 
+    /**
+     * Groups the options into categories: {@code grouping} gives an option's category, or null for an option
+     * shown in the list itself. Categories keep the order of their first options.
+     */
+    public Select<T> grouped(@Nullable Function<T, SelectGroup> grouping) {
+        this.grouping = grouping;
+        return this;
+    }
+
     public T value() {
         return value;
     }
@@ -177,16 +191,39 @@ public class Select<T> extends Container {
             look.searchIcon().paint(canvas, Rect.of(b.x() + CONTENT_LEFT, iconY, SEARCH_ICON, SEARCH_ICON));
         } else {
             Rect content = Rect.of(b.x() + CONTENT_LEFT, b.y(), arrowX - CONTENT_LEFT - ARROW_GAP, b.height());
-            paintOption(canvas, value, content, false, true, null);
+            paintOption(canvas, value, groupOf(value), content, false, true, null);
         }
         int arrowY = b.y() + Math.floorDiv(b.height() - ARROW_HEIGHT, 2);
         (open ? look.arrowOpen() : look.arrowClosed()).paint(canvas, Rect.of(b.x() + arrowX, arrowY, ARROW_WIDTH, ARROW_HEIGHT));
     }
 
-    void paintOption(Canvas canvas, @Nullable T option, Rect content, boolean hovered, boolean inField,
-                     @Nullable Function<String, List<SelectOptions.Match>> matches) {
+    private @Nullable SelectGroup groupOf(@Nullable T option) {
+        return grouping == null || option == null ? null : grouping.apply(option);
+    }
+
+    /** Width of the "›" between a category and an option label, with its gaps. */
+    private static final int PATH_SEPARATOR = 9;
+
+    void paintOption(Canvas canvas, @Nullable T option, @Nullable SelectGroup prefix, Rect content, boolean hovered,
+                     boolean inField, @Nullable Function<String, List<SelectOptions.Match>> matches) {
         if (option == null) {
             return;
+        }
+        if (prefix != null) {
+            // The category is dim and at most half the width; the option label keeps the rest.
+            String head = prefix.label().getString();
+            int textY = content.y() + (content.height() - canvas.lineHeight()) / 2 + 1;
+            int headWidth = Math.min(canvas.textWidth(head), content.width() / 2);
+            TextFit.draw(canvas, head, content.x(), textY, headWidth, look.hintColor(), false, false);
+            if (matches != null && canvas.textWidth(head) <= headWidth) {
+                paintMatches(canvas, head, content.x(), textY, matches);
+            }
+            int chevronX = content.x() + headWidth + 3;
+            for (int step = 0; step < 5; step++) {
+                canvas.fill(Rect.of(chevronX + (step < 3 ? step : 4 - step), textY + 1 + step, 1, 1), look.hintColor());
+            }
+            int shift = headWidth + PATH_SEPARATOR;
+            content = Rect.of(content.x() + shift, content.y(), Math.max(0, content.width() - shift), content.height());
         }
         int textRight = content.right() - 2;
         if (decoration != null) {
@@ -203,8 +240,13 @@ public class Select<T> extends Container {
         if (matches == null || !fits) {
             return;
         }
+        paintMatches(canvas, text, content.x(), textY, matches);
+    }
+
+    private void paintMatches(Canvas canvas, String text, int left, int textY,
+                              Function<String, List<SelectOptions.Match>> matches) {
         for (SelectOptions.Match match : matches.apply(text)) {
-            int x = content.x() + canvas.textWidth(text.substring(0, match.start()));
+            int x = left + canvas.textWidth(text.substring(0, match.start()));
             String part = text.substring(match.start(), match.end());
             canvas.text(part, x, textY, look.matchColor(), false);
             canvas.fill(Rect.of(x, textY + canvas.lineHeight(), Math.max(1, canvas.textWidth(part) - 1), 1), look.matchColor());
@@ -225,25 +267,31 @@ public class Select<T> extends Container {
         int contentWidth = Math.max(1, Math.min(width() + 2 * look.popupOutset(), area.width()) - look.popupPadding().horizontal());
         Search activeSearch = search != null && items.size() >= search.minimumOptions() ? search : null;
         int footerHeight = activeSearch == null ? 0 : SelectPopup.footerHeight(look);
-        int visibleRows = Math.max(1, Math.min(look.maxVisibleOptions(), Math.max(1, items.size())));
+        Function<T, String> searchable = item -> {
+            if (item == null) return "";
+            SelectGroup group = groupOf(item);
+            return (group == null ? "" : group.label().getString() + " ") + label.apply(item).getString() + " "
+                + Objects.toString(searchText.apply(item), "");
+        };
+        SelectRows<T> rows = new SelectRows<>(new SelectOptions<>(items, value, searchable), grouping);
+        int visibleRows = Math.max(1, Math.min(look.maxVisibleOptions(), Math.max(1, rows.rows().size())));
         int room = Math.max(area.bottom() - screenBounds().bottom(), screenBounds().y() - area.y());
         int extra = look.popupPadding().vertical() + look.listPadding().vertical() + footerHeight;
         visibleRows = Math.max(1, Math.min(visibleRows, (room - extra) / look.optionHeight()));
         int scrollHeight = visibleRows * look.optionHeight() + look.listPadding().vertical();
-        SelectOptions<T> choices = new SelectOptions<>(items, value,
-            item -> item == null ? "" : label.apply(item).getString() + " " + Objects.toString(searchText.apply(item), ""));
-        SelectPopup<T> list = new SelectPopup<>(this, look, choices, activeSearch != null,
+        SelectPopup<T> list = new SelectPopup<>(this, look, rows, activeSearch != null,
             activeSearch == null ? Component.empty() : activeSearch.noResults(), contentWidth, scrollHeight, option -> {
                 // Restore the anchor before callbacks can replace its widget subtree.
-                if (popup != null) popup.close();
+                closePopup();
                 choose(option);
-            });
+            }, null);
         list.style().margin(Insets.of(0, -look.popupOutset(), 0, -look.popupOutset()));
         content = list;
         boolean keyboardFocus = isFocusVisible();
         popup = Popup.open(this, list, visibleArea, () -> {
             popup = null;
             content = null;
+            popupFocus = null;
             closeQuery();
             if (root() == root && root.focus().focused() == null) root.focus().focus(this, keyboardFocus);
         });
@@ -258,9 +306,29 @@ public class Select<T> extends Container {
             popup.keepOpenOn(field);
             initialFocus = field;
         }
+        popupFocus = initialFocus;
         root.layoutIfNeeded();
         list.revealHighlighted();
         root.focus().focus(initialFocus, keyboardFocus);
+    }
+
+    /** The area popups of this Select stay inside; null for the whole screen. */
+    @Nullable Supplier<Rect> popupArea() {
+        return visibleArea;
+    }
+
+    void closePopup() {
+        if (popup != null) {
+            popup.close();
+        }
+    }
+
+    /** Keyboard back to the open list (or its filter input), after a submenu closed. */
+    void refocusPopup() {
+        var root = root();
+        if (root != null && popupFocus != null && popupFocus.root() == root) {
+            root.focus().focus(popupFocus, true);
+        }
     }
 
     private void closeQuery() {

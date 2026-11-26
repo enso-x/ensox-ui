@@ -164,6 +164,28 @@ the highlighted match; Space types into the filter; Escape cancels. The popup
 closes and restores the anchor's focus before notifying a change, so forms that
 replace their controls can transfer focus to the replacement.
 
+### Grouped selects (submenus)
+
+`Select.grouped(option -> SelectGroup)` sorts options into categories; a null
+group keeps an option in the list itself. Categories keep the order of their
+first options, so the option list decides the menu order. The open list shows one
+row per category with a right-pointing arrow; hovering it (or Right/Enter)
+opens its options in a submenu: another `SelectPopup` in its own overlay, placed
+by `Popup.openBeside` right of the list (left when it does not fit), its first
+row level with the category and the frames' glows overlapping by
+`Look.popupOutset`. `SelectGroup.ruleAbove` draws a dotted rule over a category
+row to set a run of categories apart.
+
+- `SelectRows` owns the rows: the category tree, or, while a filter is typed,
+  the flat matches as `category › option` (the category's label is searchable).
+- The closed field shows the value's path the same way.
+- While the pointer moves from the open category towards the submenu, rows it
+  crosses do not switch the submenu for 300 ms (`SelectPopup.towardSubmenu`, a
+  triangle from the last pointer position on the category to the submenu's
+  near edge).
+- Left or Escape in a submenu returns to the categories; a click outside every
+  list closes them all; choosing an option closes both lists.
+
 The select arrow is vertically centered from the field's actual height, using
 the same floor rounding as layout; give arrow sprites symmetric transparent
 padding so the visible mark stays centered.
