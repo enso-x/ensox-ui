@@ -103,7 +103,7 @@ public class Select<T> extends Container {
     private @Nullable TextField query;
     private @Nullable SelectPopup<T> content;
     private Function<T, String> searchText = String::valueOf;
-    private @Nullable Function<T, SelectGroup> grouping;
+    private @Nullable Function<T, List<SelectGroup>> grouping;
     private @Nullable Widget popupFocus;
 
     private record Search(int minimumOptions, Supplier<TextField> field, Component noResults) { }
@@ -157,7 +157,28 @@ public class Select<T> extends Container {
      * shown in the list itself. Categories keep the order of their first options.
      */
     public Select<T> grouped(@Nullable Function<T, SelectGroup> grouping) {
-        this.grouping = grouping;
+        return groupedPath(grouping == null ? null : option -> {
+            SelectGroup group = grouping.apply(option);
+            return group == null ? List.of() : List.of(group);
+        });
+    }
+
+    /**
+     * Nested categories: {@code path} gives an option's categories from the outermost, empty for an option shown
+     * in the list itself. Submenus list subcategories first, then a rule, then their own options. The closed
+     * field and filter results show the nearest category; the field's tooltip shows the whole path.
+     */
+    public Select<T> groupedPath(@Nullable Function<T, List<SelectGroup>> path) {
+        this.grouping = path;
+        if (path != null && style().tooltip() == null) {
+            style().tooltip(() -> {
+                List<SelectGroup> groups = value == null ? List.of() : path.apply(value);
+                if (groups == null || groups.size() < 2) return null;
+                StringBuilder text = new StringBuilder();
+                for (SelectGroup group : groups) text.append(group.label().getString()).append(" › ");
+                return List.of(Component.literal(text.append(label.apply(value).getString()).toString()));
+            });
+        }
         return this;
     }
 
@@ -197,8 +218,11 @@ public class Select<T> extends Container {
         (open ? look.arrowOpen() : look.arrowClosed()).paint(canvas, Rect.of(b.x() + arrowX, arrowY, ARROW_WIDTH, ARROW_HEIGHT));
     }
 
+    /** The category nearest to {@code option}: the prefix of its label. */
     private @Nullable SelectGroup groupOf(@Nullable T option) {
-        return grouping == null || option == null ? null : grouping.apply(option);
+        if (grouping == null || option == null) return null;
+        List<SelectGroup> path = grouping.apply(option);
+        return path == null || path.isEmpty() ? null : path.getLast();
     }
 
     /** Width of the "›" between a category and an option label, with its gaps. */
@@ -269,9 +293,10 @@ public class Select<T> extends Container {
         int footerHeight = activeSearch == null ? 0 : SelectPopup.footerHeight(look);
         Function<T, String> searchable = item -> {
             if (item == null) return "";
-            SelectGroup group = groupOf(item);
-            return (group == null ? "" : group.label().getString() + " ") + label.apply(item).getString() + " "
-                + Objects.toString(searchText.apply(item), "");
+            StringBuilder text = new StringBuilder();
+            List<SelectGroup> path = grouping == null ? null : grouping.apply(item);
+            if (path != null) path.forEach(group -> text.append(group.label().getString()).append(' '));
+            return text + label.apply(item).getString() + " " + Objects.toString(searchText.apply(item), "");
         };
         SelectRows<T> rows = new SelectRows<>(new SelectOptions<>(items, value, searchable), grouping);
         int visibleRows = Math.max(1, Math.min(look.maxVisibleOptions(), Math.max(1, rows.rows().size())));

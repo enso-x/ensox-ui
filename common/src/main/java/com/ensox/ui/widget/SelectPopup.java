@@ -107,7 +107,7 @@ final class SelectPopup<T> extends Column {
         var items = rows.rows();
         for (int i = 0; i < items.size(); i++) {
             list.add(switch (items.get(i)) {
-                case SelectRows.Option<T> option -> new OptionRow(option.value(), option.prefix(), i);
+                case SelectRows.Option<T> option -> new OptionRow(option.value(), option.prefix(), option.ruleAbove(), i);
                 case SelectRows.Group<T> group -> {
                     GroupRow row = new GroupRow(group, i);
                     groupRows.put(i, row);
@@ -191,15 +191,15 @@ final class SelectPopup<T> extends Column {
         }
         closeSubmenu(false);
         if (root() == null) return;
-        var members = row.group.members();
-        SelectOptions<T> options = new SelectOptions<>(members, owner.value(), value -> "");
-        SelectPopup<T> content = new SelectPopup<>(owner, look, new SelectRows<>(options, null), false, noResults,
-            contentWidth, listHeight(look, members.size()), choose, this);
+        SelectPopup<T> content = new SelectPopup<>(owner, look, SelectRows.submenu(row.group, owner.value()), false,
+            noResults, contentWidth, listHeight(look, row.group.children().size()), choose, this);
         // The submenu's first row lines up with the category row; the frames' glows overlap.
         int top = -(look.popupPadding().top() + look.listPadding().top());
         Popup popup = Popup.openBeside(row, this, content, owner.popupArea(), () -> submenuClosed(content),
             look.popupOutset(), top);
-        popup.keepOpenOn(this).keepOpenOn(owner);
+        // Clicks on any list of the chain switch submenus there instead of closing everything.
+        for (SelectPopup<T> list = this; list != null; list = list.parent) popup.keepOpenOn(list);
+        popup.keepOpenOn(owner);
         submenu = new Submenu<>(row, popup, content);
         rows.highlight(row.index);
         if (keyboard) focusSubmenu();
@@ -225,7 +225,10 @@ final class SelectPopup<T> extends Column {
             closingSubmenu = false;
         }
         crossingSince = -1;
-        if (refocus) owner.refocusPopup();
+        if (!refocus) return;
+        UiRoot root = root();
+        if (parent != null && root != null) root.focus().focus(this, true);
+        else owner.refocusPopup();
     }
 
     /** A submenu closed on its own (a click outside every list): the whole Select list closes. */
@@ -333,14 +336,20 @@ final class SelectPopup<T> extends Column {
         }
     }
 
+    private void paintRule(Canvas canvas, Rect b) {
+        for (int x = b.x() + 2; x < b.right() - 2; x += 2) canvas.fill(Rect.of(x, b.y(), 1, 1), look.hintColor());
+    }
+
     private final class OptionRow extends Widget {
         private final T option;
         private final @Nullable SelectGroup prefix;
+        private final boolean ruleAbove;
         private final int index;
 
-        OptionRow(T option, @Nullable SelectGroup prefix, int index) {
+        OptionRow(T option, @Nullable SelectGroup prefix, boolean ruleAbove, int index) {
             this.option = option;
             this.prefix = prefix;
+            this.ruleAbove = ruleAbove;
             this.index = index;
             style().size(Sizing.grow(), Sizing.fixed(look.optionHeight())).cursor(CursorTypes.POINTING_HAND);
             onClick(() -> choose.accept(option));
@@ -351,6 +360,7 @@ final class SelectPopup<T> extends Column {
             Rect b = bounds();
             boolean selected = index == rows.highlightedIndex();
             paintBand(canvas, b, selected, isHovered());
+            if (ruleAbove) paintRule(canvas, b);
             owner.paintOption(canvas, option, prefix, Rect.of(b.x() + 6, b.y(), b.width() - 11, b.height()),
                 selected || isHovered(), false, filtered ? rows.options()::matches : null);
         }
@@ -376,9 +386,7 @@ final class SelectPopup<T> extends Column {
             boolean open = submenu != null && submenu.row() == this;
             boolean selected = open || index == rows.highlightedIndex();
             paintBand(canvas, b, selected, isHovered());
-            if (group.group().ruleAbove() && index > 0) {
-                for (int x = b.x() + 2; x < b.right() - 2; x += 2) canvas.fill(Rect.of(x, b.y(), 1, 1), look.hintColor());
-            }
+            if (group.group().ruleAbove() && index > 0) paintRule(canvas, b);
             int arrowX = b.right() - 6 - ARROW_WIDTH;
             int textY = b.y() + (b.height() - canvas.lineHeight()) / 2 + 1;
             TextFit.draw(canvas, group.group().label().getString(), b.x() + 6, textY, Math.max(0, arrowX - 4 - b.x() - 6),

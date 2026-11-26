@@ -176,9 +176,16 @@ row level with the category and the frames' glows overlapping by
 `Look.popupOutset`. `SelectGroup.ruleAbove` draws a dotted rule over a category
 row to set a run of categories apart.
 
+- `Select.groupedPath(option -> List<SelectGroup>)` nests categories (outermost
+  first); `grouped` is the one-level case. A submenu lists its subcategories
+  first, then a dotted rule, then its own options.
 - `SelectRows` owns the rows: the category tree, or, while a filter is typed,
-  the flat matches as `category › option` (the category's label is searchable).
-- The closed field shows the value's path the same way.
+  the flat matches as `nearest category › option` (every category of the path
+  is searchable).
+- The closed field shows the nearest category the same way; its tooltip shows
+  the whole path.
+- A click on any list of the chain switches submenus there; Left/Escape close
+  only the deepest submenu and return the keyboard to its parent list.
 - While the pointer moves from the open category towards the submenu, rows it
   crosses do not switch the submenu for 300 ms (`SelectPopup.towardSubmenu`, a
   triangle from the last pointer position on the category to the submenu's

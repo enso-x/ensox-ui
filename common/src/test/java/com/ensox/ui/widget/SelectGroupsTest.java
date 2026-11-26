@@ -39,7 +39,7 @@ class SelectGroupsTest {
 
     private static SelectRows<String> rows(String selected) {
         return new SelectRows<>(new SelectOptions<>(OPTIONS, selected, value -> GROUPS.containsKey(value)
-            ? GROUPS.get(value).label().getString() + " " + value : value), GROUPS::get);
+            ? GROUPS.get(value).label().getString() + " " + value : value), value -> GROUPS.containsKey(value) ? List.of(GROUPS.get(value)) : List.of());
     }
 
     @Test void treeKeepsFirstAppearanceOrderAndHighlightsTheValuesCategory() {
@@ -47,9 +47,10 @@ class SelectGroupsTest {
         assertTrue(rows.isTree());
         List<SelectRows.Row<String>> tree = rows.rows();
         assertEquals(3, tree.size());
-        assertEquals(new SelectRows.Group<>(ITEM, List.of("itemId", "rarity")), tree.get(0));
+        assertEquals(ITEM, ((SelectRows.Group<String>) tree.get(0)).group());
+        assertEquals(List.of("itemId", "rarity"), ((SelectRows.Group<String>) tree.get(0)).members());
         assertEquals(new SelectRows.Option<>("selector", null), tree.get(1));
-        assertEquals(new SelectRows.Group<>(SMITHERY, List.of("smithery:rarity", "smithery:sharpening")), tree.get(2));
+        assertEquals(List.of("smithery:rarity", "smithery:sharpening"), ((SelectRows.Group<String>) tree.get(2)).members());
         assertEquals(2, rows.highlightedIndex());
     }
 
@@ -98,7 +99,7 @@ class SelectGroupsTest {
         assertTrue(select.isOpen());
         root.keyPressed(key(InputConstants.KEY_RIGHT));
         assertEquals(2, root.overlays().size());
-        root.pointerPressed(399, 299, 0, 0, false);
+        root.pointerPressed(399, 299, InputConstants.MOUSE_BUTTON_LEFT, 0, false);
         assertTrue(root.overlays().isEmpty());
         assertEquals("itemId", select.value());
     }
@@ -140,6 +141,61 @@ class SelectGroupsTest {
     private static void frame(UiRoot root) {
         List.copyOf(root.animations()).forEach(task -> { if (!task.tick(0)) root.animations().remove(task); });
         root.layoutIfNeeded();
+    }
+
+    private static final SelectGroup MODIFIERS = new SelectGroup("modifiers", Component.literal("Modifiers"));
+    private static final List<String> NESTED = List.of("itemId", "smithery:rarity", "smithery:sharpness", "smithery:haste");
+    private static List<SelectGroup> path(String option) {
+        return switch (option) {
+            case "itemId" -> List.of(ITEM);
+            case "smithery:rarity" -> List.of(SMITHERY);
+            default -> List.of(SMITHERY, MODIFIERS);
+        };
+    }
+
+    @Test void nestedCategoriesListSubcategoriesFirstThenARuleThenOptions() {
+        SelectRows<String> rows = new SelectRows<>(new SelectOptions<>(NESTED, "smithery:haste",
+            value -> String.join(" ", path(value).stream().map(group -> group.label().getString()).toList()) + " " + value),
+            SelectGroupsTest::path);
+        var smithery = (SelectRows.Group<String>) rows.rows().get(1);
+        assertEquals(1, rows.highlightedIndex());
+        assertEquals(List.of("smithery:rarity", "smithery:sharpness", "smithery:haste"), smithery.members());
+        SelectRows<String> submenu = SelectRows.submenu(smithery, "smithery:haste");
+        assertEquals(MODIFIERS, ((SelectRows.Group<String>) submenu.rows().get(0)).group(), "subcategories come first");
+        assertEquals(new SelectRows.Option<>("smithery:rarity", null, true), submenu.rows().get(1), "a rule above the options");
+        assertEquals(0, submenu.highlightedIndex());
+        rows.filter("modifiers");
+        assertEquals(List.of(new SelectRows.Option<>("smithery:sharpness", MODIFIERS),
+            new SelectRows.Option<>("smithery:haste", MODIFIERS)), rows.rows(), "the whole path is searchable; the prefix is the nearest");
+    }
+
+    @Test void threeLevelsByKeyboardAndAClickOnTheFirstListSwitchesInsteadOfClosing() {
+        Select<String> select = Select.of(Signal.of("itemId"), () -> NESTED, Component::literal, LOOK)
+            .groupedPath(SelectGroupsTest::path);
+        UiRoot root = root(select);
+        root.resize(800, 300);   // room for three lists side by side
+        root.layoutIfNeeded();
+        root.focus().focus(select, true);
+        root.keyPressed(key(InputConstants.KEY_RETURN));
+        root.keyPressed(key(InputConstants.KEY_DOWN));     // Smithery
+        root.keyPressed(key(InputConstants.KEY_RIGHT));
+        root.keyPressed(key(InputConstants.KEY_RIGHT));    // Modifiers
+        assertEquals(3, root.overlays().size());
+        root.keyPressed(key(InputConstants.KEY_LEFT));
+        assertEquals(2, root.overlays().size(), "Left closes only the deepest submenu");
+        root.keyPressed(key(InputConstants.KEY_RIGHT));
+        assertEquals(3, root.overlays().size(), "the keyboard is back in the second list");
+        root.layoutIfNeeded();
+        Rect list = ((Popup) root.overlays().getFirst().widget()).children().getFirst().screenBounds();
+        int firstRow = list.y() + LOOK.popupPadding().top() + LOOK.listPadding().top();
+        root.pointerPressed(list.x() + 20, firstRow + 10, InputConstants.MOUSE_BUTTON_LEFT, 0, false);   // Item, in the first list
+        root.pointerReleased(list.x() + 20, firstRow + 10, InputConstants.MOUSE_BUTTON_LEFT, 0);
+        assertTrue(select.isOpen(), "a click on an ancestor list does not close the menu");
+        assertEquals(2, root.overlays().size(), "it switches to that category's submenu");
+        root.keyPressed(key(InputConstants.KEY_RIGHT));
+        root.keyPressed(key(InputConstants.KEY_RETURN));
+        assertEquals("itemId", select.value());
+        assertTrue(root.overlays().isEmpty());
     }
 
     @Test void thePointerPathTowardsTheSubmenuIsATriangle() {
